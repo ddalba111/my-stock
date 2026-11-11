@@ -270,24 +270,27 @@ def sync_portfolio_to_params(data):
             avg = inf.get("avg_price", 0.0)
             if sh > 0:
                 items.append(f"{s}:{sh}:{avg}")
-        if items and hasattr(st, "query_params"):
-            st.query_params["p"] = "_".join(items)
+        if hasattr(st, "query_params"):
+            if items:
+                st.query_params["p"] = "_".join(items)
+            elif "p" in st.query_params:
+                del st.query_params["p"]
     except Exception:
         pass
 
 def load_portfolio():
     param_data = parse_portfolio_from_params()
-    if param_data:
+    if param_data is not None:
         return param_data
     if os.path.exists(PORTFOLIO_FILE):
         try:
             with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
                 d = json.load(f)
-                if isinstance(d, dict) and d:
+                if isinstance(d, dict):
                     return d
         except Exception:
             pass
-    return {"SOXL": {"shares": 15, "avg_price": 63.56}}
+    return {}
 
 def save_portfolio(data):
     try:
@@ -615,11 +618,11 @@ with tab_portfolio:
     with st.expander("➕ 새 종목 등록 또는 수량 변경", expanded=False):
         c_e1, c_e2, c_e3 = st.columns(3)
         with c_e1:
-            edit_sym = st.text_input("티커 (예: SOXL, TSLA)", value="SOXL").strip().upper()
+            edit_sym = st.text_input("티커 (예: SOXL, TSLA)", value="").strip().upper()
         with c_e2:
-            edit_shares = st.number_input("보유 수량 (주, 0이면 삭제)", min_value=0, value=15, step=1)
+            edit_shares = st.number_input("보유 수량 (주, 0이면 삭제)", min_value=0, value=0, step=1)
         with c_e3:
-            edit_avg = st.number_input("매수 평단가 ($)", min_value=0.0, value=63.56, step=0.1, format="%.2f")
+            edit_avg = st.number_input("매수 평단가 ($)", min_value=0.0, value=0.0, step=0.1, format="%.2f")
 
         if st.button("💾 저장 / 수정하기"):
             if edit_sym:
