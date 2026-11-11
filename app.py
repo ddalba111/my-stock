@@ -61,7 +61,7 @@ st.markdown("""
 
 # 1. 메인 타이틀
 st.title("📈 퀀트 분석기")
-st.caption("단타 4박자 타점부터 중장기 밸류에이션까지 전천후 퀀트 진단")
+st.caption("단타 4박자 타점부터 실시간 보유 손익, 중장기 밸류에이션까지 전천후 퀀트 진단")
 
 # 2. 인기 종목 빠른 선택 (가로 2열 8종목)
 st.write("🔥 **인기 종목 빠른 선택**")
@@ -87,9 +87,14 @@ with row2_col3:
 with row2_col4:
     if st.button("CONL"): selected_quick = "CONL"
 
-# 세션 상태로 티커 유지
+# 세션 상태로 티커 및 포트폴리오 유지
 if "current_ticker" not in st.session_state:
     st.session_state.current_ticker = "SOXL"
+
+if "my_portfolio" not in st.session_state:
+    st.session_state.my_portfolio = {
+        "SOXL": {"shares": 15, "avg_price": 63.56}
+    }
 
 if selected_quick:
     st.session_state.current_ticker = selected_quick
@@ -241,6 +246,53 @@ if ticker:
         # 헤더
         st.subheader(f"📊 {ticker} 현재가: ${curr:.2f} (약 {curr_krw:,.0f}원)")
         st.caption(f"선택 모드: **{mode_name}** | 실시간 시세 반영")
+
+        # 💼 내 실시간 보유 포지션 & 평가 손익 관리 (신규 기능)
+        st.markdown(f"### 💼 {ticker} 내 보유 주식 & 실시간 평가 손익")
+        holding_info = st.session_state.my_portfolio.get(ticker, {"shares": 0, "avg_price": 0.0})
+
+        with st.expander("📌 내 보유 수량 및 평단가 설정하기", expanded=(holding_info['shares'] > 0)):
+            p_col1, p_col2 = st.columns(2)
+            with p_col1:
+                my_shares = st.number_input("보유 수량 (주)", min_value=0, value=int(holding_info['shares']), step=1, key=f"shares_{ticker}")
+            with p_col2:
+                my_avg_price = st.number_input("매수 평단가 ($)", min_value=0.0, value=float(holding_info['avg_price']), step=0.1, format="%.2f", key=f"avg_{ticker}")
+
+            st.session_state.my_portfolio[ticker] = {"shares": my_shares, "avg_price": my_avg_price}
+
+            if my_shares > 0 and my_avg_price > 0:
+                invested_usd = my_shares * my_avg_price
+                invested_krw = invested_usd * usd_krw
+                current_val_usd = my_shares * curr
+                current_val_krw = current_val_usd * usd_krw
+                pnl_usd = current_val_usd - invested_usd
+                pnl_krw = current_val_krw - invested_krw
+                pnl_pct = (pnl_usd / invested_usd) * 100
+
+                is_profit = pnl_usd >= 0
+                color_pnl = "#4ade80" if is_profit else "#f87171"
+                bg_pnl = "#134e4a" if is_profit else "#7f1d1d"
+                border_pnl = "#2dd4bf" if is_profit else "#f87171"
+                sign = "+" if is_profit else ""
+
+                st.markdown(f"""
+                <div style="background-color: {bg_pnl}; border: 1px solid {border_pnl}; border-radius: 12px; padding: 16px; margin-top: 10px; margin-bottom: 10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:1.05rem; font-weight:bold; color:#f1f5f9;">실시간 평가 손익</span>
+                        <span style="font-size:1.35rem; font-weight:800; color:{color_pnl};">{sign}${pnl_usd:.2f} ({sign}{pnl_pct:.2f}%)</span>
+                    </div>
+                    <div style="font-size:1.3rem; font-weight:800; color:{color_pnl}; text-align:right; margin-top:4px;">
+                        {sign}{pnl_krw:,.0f} 원
+                    </div>
+                    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.2); margin:10px 0;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#cbd5e1;">
+                        <span>총 매수 원금: <b>${invested_usd:,.2f}</b> ({invested_krw:,.0f}원)</span>
+                        <span>현재 평가액: <b>${current_val_usd:,.2f}</b> ({current_val_krw:,.0f}원)</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            elif my_shares == 0:
+                st.info("💡 보유 중인 주식 수량과 평단가를 입력하시면 실시간 평가 손익과 원화 수익금이 계산됩니다.")
 
         # 판정 배너
         if passed_cnt >= 4:
