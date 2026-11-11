@@ -398,6 +398,50 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
+# 🚦 내 보유 종목 실시간 신호등 바 (모바일 네이티브 스타일)
+if portfolio_items:
+    cards_html = []
+    for item in portfolio_items:
+        sym = item["symbol"]
+        pct = item["pnl_pct"]
+        lp = item["live_price"]
+
+        if pct >= 3.5:
+            light = "🟢"
+            status_text = "익절 권장"
+            status_color = "#4ade80"
+        elif pct >= 0:
+            light = "🟢"
+            status_text = "홀딩 순항"
+            status_color = "#38bdf8"
+        elif pct >= -1.5:
+            light = "🟡"
+            status_text = "관망 지지"
+            status_color = "#facc15"
+        else:
+            light = "🔴"
+            status_text = "손절 주의"
+            status_color = "#f87171"
+
+        sign = "+" if pct >= 0 else ""
+        cards_html.append(f"""
+        <div style="flex:1; min-width:70px; background-color:#1e293b; border-radius:8px; padding:8px 4px; text-align:center; border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:0.8rem; font-weight:bold; color:white;">{light} {sym}</div>
+            <div style="font-size:0.95rem; font-weight:800; color:{status_color}; margin:2px 0;">{sign}{pct:.1f}%</div>
+            <div style="font-size:0.7rem; color:#94a3b8;">{status_text}</div>
+        </div>
+        """)
+
+    all_cards = "".join(cards_html)
+    st.markdown(f"""
+    <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;">
+        <div style="font-size:0.8rem; font-weight:bold; color:#94a3b8; margin-bottom:6px;">🚦 내 보유 종목 실시간 신호등</div>
+        <div style="display:flex; gap:6px; justify-content:space-between; overflow-x:auto;">
+            {all_cards}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 # 레이더 타점 포착 시에만 특별 배너 표시
 if radar_hits:
     hit_texts = " · ".join([f"<b>{h['symbol']}</b> (${h['price']:.2f})" for h in radar_hits])
