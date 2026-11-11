@@ -311,49 +311,20 @@ if "current_ticker" not in st.session_state:
 if "main_ticker_input" not in st.session_state:
     st.session_state.main_ticker_input = "SOXL"
 
-# 1. 메인 타이틀 & 새로고침 버튼
+# 1. 메인 타이틀 & 새로고침 버튼 (슬림 헤더)
 col_title, col_ref = st.columns([3, 2])
 with col_title:
     st.title("📈 퀀트 분석기")
 with col_ref:
     st.write("")
-    if st.button("🔄 실시간 새로고침", type="primary", use_container_width=True):
+    if st.button("🔄 새로고침", type="primary", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
 now_kr_str = datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%H:%M:%S")
-st.caption(f"⚡ 실시간 호가 연동 (최근 갱신: 한국 시각 {now_kr_str})")
-
-# 🚨 실시간 퀀트 타점 포착 레이더 배너
-radar_hits = scan_radar_opportunities()
-if radar_hits:
-    hit_texts = " · ".join([f"<b>{h['symbol']}</b> (${h['price']:.2f}, RSI {h['rsi']:.1f})" for h in radar_hits])
-    st.markdown(f"""
-    <div style="background-color: #14532d; border: 1.5px solid #22c55e; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
-        <span style="font-size:1.0rem; font-weight:800; color:#86efac;">🚨 [실시간 타점 포착 레이더] 매수 진입 유력 종목 발견!</span><br>
-        <span style="font-size:0.85rem; color:#f0fdf4;">현재 4박자 조건을 충족한 종목: {hit_texts}</span>
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown(f"""
-    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
-        <span style="font-size:0.85rem; color:#94a3b8;">📡 <b>실시간 타점 레이더</b>: 현재 주요 주도주 과열/대기 중 (안전한 4박자 타점 포착 시 즉시 배너 표시)</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-# 🧠 월가 공포 & 탐욕 지수 (Fear & Greed Index)
-fg_score, fg_label, fg_color, fg_bg = get_fear_and_greed()
-st.markdown(f"""
-<div style="background-color: {fg_bg}; border: 1px solid {fg_color}; border-radius: 10px; padding: 8px 14px; margin-bottom: 12px;">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:0.9rem; font-weight:bold; color:#cbd5e1;">🧠 월가 공포 & 탐욕 지수</span>
-        <span style="font-size:1.05rem; font-weight:800; color:{fg_color};">{fg_score:.0f}점 · {fg_label}</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
 
 # ==============================================================================
-# 🔥 [상시 고정] 내 실시간 보유 주식 요약 바 (어떤 화면에서도 항상 보임)
+# 🔥 [상시 고정] 스마트 올인원 상태 대시보드
 # ==============================================================================
 total_invest_usd = 0.0
 total_curr_usd = 0.0
@@ -365,7 +336,7 @@ for sym, info in st.session_state.my_portfolio.items():
     if sh > 0 and avg > 0:
         lp = get_live_price(sym)
         if lp == 0.0:
-            lp = avg  # 조회 실패 시 원금으로 폴백
+            lp = avg
         inv = sh * avg
         cur = sh * lp
         diff = cur - inv
@@ -392,50 +363,71 @@ bar_bg = "#134e4a" if is_total_profit else "#7f1d1d"
 bar_border = "#2dd4bf" if is_total_profit else "#f87171"
 bar_sign = "+" if is_total_profit else ""
 
+fg_score, fg_label, fg_color, fg_bg = get_fear_and_greed()
+radar_hits = scan_radar_opportunities()
+
 if portfolio_items:
     item_summaries = " · ".join([f"<b>{item['symbol']}</b> {item['shares']}주 (${item['live_price']:.2f})" for item in portfolio_items])
     st.markdown(f"""
     <div style="background-color: {bar_bg}; border: 1px solid {bar_border}; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:0.95rem; font-weight:bold; color:#e2e8f0;">💼 내 실시간 총 손익</span>
+            <span style="font-size:0.95rem; font-weight:bold; color:#e2e8f0;">💼 실시간 총 손익</span>
             <span style="font-size:1.25rem; font-weight:800; color:{bar_color};">{bar_sign}${total_pnl_usd:.2f} ({bar_sign}{total_pnl_pct:.2f}%)</span>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:3px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
             <span style="font-size:0.85rem; color:#cbd5e1;">{item_summaries}</span>
             <span style="font-size:1.15rem; font-weight:800; color:{bar_color};">{bar_sign}{total_pnl_krw:,.0f} 원</span>
+        </div>
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.12); margin: 8px 0 6px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#cbd5e1;">
+            <span>🧠 월가 심리: <b style="color:{fg_color};">{fg_score:.0f}점 {fg_label.split()[1] if len(fg_label.split())>1 else ''}</b></span>
+            <span>📡 타점 레이더: <b>{'🚨 타점 포착!' if radar_hits else '안전 관망 중'}</b></span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.9rem; color:#94a3b8;">💼 등록된 보유 주식 없음</span>
+            <span style="font-size:0.8rem; color:#cbd5e1;">🧠 심리: <b style="color:{fg_color};">{fg_score:.0f}점</b></span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 1. 실시간 익절/손절 도달 알림 배너
-    for item in portfolio_items:
-        i_sym = item['symbol']
-        i_pct = item['pnl_pct']
-        i_pnl_krw = item['pnl_usd'] * usd_krw
-        i_live = item['live_price']
-        if i_pct >= 7.0:
-            st.markdown(f"""
-            <div style="background-color: #064e3b; border: 1.5px solid #10b981; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
-                <span style="font-size:1.0rem; font-weight:800; color:#6ee7b7;">🎉 [익절 신호] {i_sym} 2차 목표가(+7.0%) 돌파 완료!</span><br>
-                <span style="font-size:0.85rem; color:#e2e8f0;">현재가 ${i_live:.2f} (수익률 <b>+{i_pct:.2f}%</b>, 평가익 <b>+{i_pnl_krw:,.0f}원</b>) — 50% 분할 익절 또는 전량 익절 타이밍입니다!</span>
-            </div>
-            """, unsafe_allow_html=True)
-        elif i_pct >= 3.5:
-            st.markdown(f"""
-            <div style="background-color: #1e3a8a; border: 1.5px solid #3b82f6; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
-                <span style="font-size:1.0rem; font-weight:800; color:#93c5fd;">🎯 [익절 신호] {i_sym} 1차 목표가(+3.5%) 도달!</span><br>
-                <span style="font-size:0.85rem; color:#e2e8f0;">현재가 ${i_live:.2f} (수익률 <b>+{i_pct:.2f}%</b>, 평가익 <b>+{i_pnl_krw:,.0f}원</b>) — 50% 분할 매도로 수익을 확정하세요!</span>
-            </div>
-            """, unsafe_allow_html=True)
-        elif i_pct <= -1.8:
-            st.markdown(f"""
-            <div style="background-color: #7f1d1d; border: 1.5px solid #ef4444; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
-                <span style="font-size:1.0rem; font-weight:800; color:#fca5a5;">⚠️ [손절 경고] {i_sym} 손절 기준선(-1.8%) 이탈!</span><br>
-                <span style="font-size:0.85rem; color:#fecaca;">현재가 ${i_live:.2f} (손실률 <b>{i_pct:.2f}%</b>) — 원금 보존을 위해 칼손절을 권장합니다!</span>
-            </div>
-            """, unsafe_allow_html=True)
-else:
-    st.info("💡 등록된 보유 주식이 없습니다. 아래 '💼 내 보유 잔고' 탭에서 종목과 수량을 등록하세요!")
+# 레이더 타점 포착 시에만 특별 배너 표시
+if radar_hits:
+    hit_texts = " · ".join([f"<b>{h['symbol']}</b> (${h['price']:.2f})" for h in radar_hits])
+    st.markdown(f"""
+    <div style="background-color: #14532d; border: 1.5px solid #22c55e; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
+        <span style="font-size:0.95rem; font-weight:800; color:#86efac;">🚨 [실시간 타점 포착] 매수 유력: {hit_texts}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+# 실시간 익절/손절 도달 알림 (조건 부합 시에만 슬림하게 1줄 표시)
+for item in portfolio_items:
+    i_sym = item['symbol']
+    i_pct = item['pnl_pct']
+    i_pnl_krw = item['pnl_usd'] * usd_krw
+    i_live = item['live_price']
+    if i_pct >= 7.0:
+        st.markdown(f"""
+        <div style="background-color: #064e3b; border: 1.5px solid #10b981; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
+            <span style="font-size:0.9rem; font-weight:800; color:#6ee7b7;">🎉 [익절 도달] {i_sym} 2차 목표(+7%) 돌파! (${i_live:.2f}, +{i_pnl_krw:,.0f}원) — 전량/분할 익절 권장!</span>
+        </div>
+        """, unsafe_allow_html=True)
+    elif i_pct >= 3.5:
+        st.markdown(f"""
+        <div style="background-color: #1e3a8a; border: 1.5px solid #3b82f6; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
+            <span style="font-size:0.9rem; font-weight:800; color:#93c5fd;">🎯 [익절 도달] {i_sym} 1차 목표(+3.5%) 도달! (${i_live:.2f}, +{i_pnl_krw:,.0f}원) — 50% 분할 매도 권장!</span>
+        </div>
+        """, unsafe_allow_html=True)
+    elif i_pct <= -1.8:
+        st.markdown(f"""
+        <div style="background-color: #7f1d1d; border: 1.5px solid #ef4444; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
+            <span style="font-size:0.9rem; font-weight:800; color:#fca5a5;">⚠️ [손절 경고] {i_sym} 손절선(-1.8%) 이탈! (${i_live:.2f}) — 칼손절 권장!</span>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ==============================================================================
 # 2대 메인 탭 분리: [1. 💼 내 보유 잔고 전용 화면] vs [2. 📈 종목별 퀀트 타점 분석]
@@ -564,55 +556,57 @@ with tab_portfolio:
         </div>
         """, unsafe_allow_html=True)
 
-        # 2. 누적 실현 손익 장부
+        # 2. 누적 실현 손익 장부 (접어두기)
         st.markdown("---")
-        st.subheader("💰 이번 달 누적 실현 손익 (익절 장부)")
         journal_entries = load_journal()
-        if journal_entries:
-            tot_realized_krw = sum(x.get("profit_krw", 0) for x in journal_entries)
-            tot_realized_usd = sum(x.get("profit_usd", 0.0) for x in journal_entries)
-            j_color = "#4ade80" if tot_realized_krw >= 0 else "#f87171"
-            j_sign = "+" if tot_realized_krw >= 0 else ""
+        tot_realized_krw = sum(x.get("profit_krw", 0) for x in journal_entries)
+        tot_realized_usd = sum(x.get("profit_usd", 0.0) for x in journal_entries)
+        j_sign = "+" if tot_realized_krw >= 0 else ""
 
-            st.markdown(f"""
-            <div style="background-color: #1a1e29; border: 1px solid #3b82f6; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:1.0rem; font-weight:bold; color:#93c5fd;">총 누적 확정 수익금</span>
-                    <span style="font-size:1.35rem; font-weight:800; color:{j_color};">{j_sign}{tot_realized_krw:,.0f} 원</span>
-                </div>
-                <div style="text-align:right; font-size:0.9rem; color:#cbd5e1; margin-top:2px;">
-                    {j_sign}${tot_realized_usd:.2f} (총 {len(journal_entries)}회 매매 확정)
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            for idx, j in enumerate(journal_entries):
-                p_c = "#4ade80" if j.get("profit_krw", 0) >= 0 else "#f87171"
-                p_s = "+" if j.get("profit_krw", 0) >= 0 else ""
-                col_rec, col_del = st.columns([5, 1])
-                with col_rec:
-                    st.markdown(f"""
-                    <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;">
-                        <div style="display:flex; justify-content:space-between;">
-                            <span style="font-weight:bold; color:white;">{j.get('symbol')} ({j.get('shares')}주 @ ${j.get('sell_price'):.2f})</span>
-                            <span style="font-weight:bold; color:{p_c};">{p_s}{j.get('profit_krw'):,.0f}원 ({p_s}{j.get('pct')}%)</span>
-                        </div>
-                        <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
-                            {j.get('date')} · {j.get('note', '')}
-                        </div>
+        with st.expander(f"💰 이번 달 누적 실현 손익 장부 ({j_sign}{tot_realized_krw:,.0f}원 / {len(journal_entries)}회 매매)", expanded=False):
+            if journal_entries:
+                j_color = "#4ade80" if tot_realized_krw >= 0 else "#f87171"
+                st.markdown(f"""
+                <div style="background-color: #1a1e29; border: 1px solid #3b82f6; border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.95rem; font-weight:bold; color:#93c5fd;">총 누적 확정 수익금</span>
+                        <span style="font-size:1.25rem; font-weight:800; color:{j_color};">{j_sign}{tot_realized_krw:,.0f} 원</span>
                     </div>
-                    """, unsafe_allow_html=True)
-                with col_del:
-                    st.write("")
-                    if st.button("🗑️", key=f"del_rec_{idx}", help="이 기록 삭제"):
-                        journal_entries.pop(idx)
-                        save_journal(journal_entries)
-                        st.rerun()
+                    <div style="text-align:right; font-size:0.85rem; color:#cbd5e1; margin-top:2px;">
+                        {j_sign}${tot_realized_usd:.2f} (총 {len(journal_entries)}회 매매 확정)
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-            if st.button("⚠️ 장부 전체 기록 삭제", type="secondary"):
-                save_journal([])
-                st.success("장부의 모든 기록이 삭제되었습니다.")
-                st.rerun()
+                for idx, j in enumerate(journal_entries):
+                    p_c = "#4ade80" if j.get("profit_krw", 0) >= 0 else "#f87171"
+                    p_s = "+" if j.get("profit_krw", 0) >= 0 else ""
+                    col_rec, col_del = st.columns([5, 1])
+                    with col_rec:
+                        st.markdown(f"""
+                        <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span style="font-weight:bold; color:white;">{j.get('symbol')} ({j.get('shares')}주 @ ${j.get('sell_price'):.2f})</span>
+                                <span style="font-weight:bold; color:{p_c};">{p_s}{j.get('profit_krw'):,.0f}원 ({p_s}{j.get('pct')}%)</span>
+                            </div>
+                            <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+                                {j.get('date')}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with col_del:
+                        st.write("")
+                        if st.button("🗑️", key=f"del_rec_{idx}", help="이 기록 삭제"):
+                            journal_entries.pop(idx)
+                            save_journal(journal_entries)
+                            st.rerun()
+
+                if st.button("⚠️ 장부 전체 기록 삭제", type="secondary"):
+                    save_journal([])
+                    st.success("장부의 모든 기록이 삭제되었습니다.")
+                    st.rerun()
+            else:
+                st.write("아직 등록된 매매 기록이 없습니다.")
     else:
         st.write("아직 등록된 보유 종목이 없습니다.")
 
@@ -756,34 +750,56 @@ with tab_analysis:
             st.subheader(f"📊 {ticker} 현재가: ${curr:.2f} (약 {curr_krw:,.0f}원)")
             st.caption(f"선택 모드: **{mode_name}** | 실시간 시세 반영")
 
-            # 판정 배너
+            # 1. 🎯 타점 판정 & 매수 권장가 통합 카드
             if passed_cnt >= 4:
-                st.markdown(f"""
-                <div class="verdict-box" style="background-color: #134e4a; color: #4ade80; border: 1px solid #2dd4bf;">
-                    ⭐ 강력 매수 진입 타점 (STRONG BUY) ⭐<br>
-                    <span class="sub-stat" style="color: #a7f3d0;">4박자 필터 {passed_cnt}/5개 충족 (상승 모멘텀 탄력 구간)</span>
-                </div>
-                """, unsafe_allow_html=True)
+                v_title = "⭐ 강력 매수 타점 (STRONG BUY)"
+                v_color = "#4ade80"
+                v_bg = "#134e4a"
+                v_border = "#2dd4bf"
+                v_sub = f"4박자 필터 {passed_cnt}/5개 충족 (상승 모멘텀 탄력)"
             elif passed_cnt == 3:
-                st.markdown(f"""
-                <div class="verdict-box" style="background-color: #713f12; color: #facc15; border: 1px solid #fde047;">
-                    🟡 눌림목 대기 / 관망 (WATCH)<br>
-                    <span class="sub-stat" style="color: #fef08a;">조건 {passed_cnt}/5개 충족 (지지선 확인 후 진입 권장)</span>
-                </div>
-                """, unsafe_allow_html=True)
+                v_title = "🟡 눌림목 대기 / 관망 (WATCH)"
+                v_color = "#facc15"
+                v_bg = "#713f12"
+                v_border = "#fde047"
+                v_sub = f"조건 {passed_cnt}/5개 충족 (지지선 확인 후 진입)"
             else:
-                st.markdown(f"""
-                <div class="verdict-box" style="background-color: #7f1d1d; color: #f87171; border: 1px solid #fca5a5;">
-                    ⚪ 진입 부적합 / 매수 금지 (WAIT)<br>
-                    <span class="sub-stat" style="color: #fecaca;">역배열 또는 단기 과열 구간 (무리한 진입 금물)</span>
-                </div>
-                """, unsafe_allow_html=True)
+                v_title = "⚪ 진입 부적합 / 대기 (WAIT)"
+                v_color = "#f87171"
+                v_bg = "#7f1d1d"
+                v_border = "#fca5a5"
+                v_sub = "역배열 또는 단기 과열 구간 (무리한 진입 금물)"
 
-            # 트레이딩뷰 프로 차트
-            st.markdown(f"### 📺 실시간 프로 차트 ({ticker})")
-            st.caption("💡 캔들 위 이동평균선(MA)과 아래 RSI 지표가 기본 탑재되어 있으며, 상단 '지표(fx)' 메뉴에서 원하는 지표를 자유롭게 추가할 수 있습니다.")
+            buy_rec_low = min(curr, ema9)
+            buy_rec_high = max(curr, ema9)
+            buy_rec_krw = curr * usd_krw
+
+            st.markdown(f"""
+            <div style="background-color: {v_bg}; border: 1.5px solid {v_border}; border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:1.05rem; font-weight:800; color:{v_color};">{v_title}</span>
+                    <span style="font-size:0.8rem; color:#e2e8f0;">{v_sub}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; border-top:1px solid rgba(255,255,255,0.15); padding-top:6px;">
+                    <span style="font-size:0.85rem; color:#cbd5e1;">🎯 매수 권장가 (9선 지지)</span>
+                    <span style="font-size:1.15rem; font-weight:800; color:#38bdf8;">${buy_rec_low:.2f} ~ ${buy_rec_high:.2f} <span style="font-size:0.85rem; color:#cbd5e1;">(약 {buy_rec_krw:,.0f}원)</span></span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # 2. 실전 주문 목표가
+            m1, m2 = st.columns(2)
+            with m1:
+                st.metric(f"1차 익절가 (+{target_tp1_pct*100:.1f}%)", f"${tp1:.2f}", f"약 {tp1*usd_krw:,.0f}원")
+                st.metric(f"2차 익절가 (+{target_tp2_pct*100:.1f}%)", f"${tp2:.2f}", f"약 {tp2*usd_krw:,.0f}원")
+            with m2:
+                st.metric("칼손절가 (SL)", f"${sl:.2f}", f"{sl_pct:.2f}% (직전 저점)")
+                st.metric("기대 손익비", f"1 : {rr:.2f}", "검증된 기대치")
+
+            # 3. 트레이딩뷰 프로 차트
+            st.markdown(f"### 📺 실시간 차트 ({ticker})")
             tv_html = f"""
-            <div class="tradingview-widget-container" style="height:420px;width:100%;">
+            <div class="tradingview-widget-container" style="height:400px;width:100%;">
               <div id="tradingview_{ticker}" style="height:100%;width:100%;"></div>
               <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
               <script type="text/javascript">
@@ -812,61 +828,39 @@ with tab_analysis:
               </script>
             </div>
             """
-            components.html(tv_html, height=430)
+            components.html(tv_html, height=410)
 
-            # 장기 투자 관점 정밀 진단 카드 (실제 1년치 일봉 데이터 기반)
-            st.markdown("### 🏛️ 장기 투자 관점 정밀 진단")
+            # 4. 세부 지표 상태
+            st.markdown("### 📋 4대 퀀트 지표 정밀 진단")
+            c_col1, c_col2 = st.columns(2)
+            with c_col1:
+                st.write(f"• **50일선**: ${sma50:.2f} ({'🟢 상승' if c1 else '🔴 하락'})")
+                st.write(f"• **이평배열**: {'🟢 정배열' if c2 else '🔴 역배열'}")
+            with c_col2:
+                st.write(f"• **RSI**: {rsi:.1f} ({'🟢 탄력' if c4 else '⚠️ 과열/침체'})")
+                st.write(f"• **거래량비**: {vol_ratio:.2f}배 ({'🟢 급증' if c5 else '⚪ 평이'})")
+
+            # 5. 장기 투자 관점 (접어두기)
             real_sma200, real_high52, real_low52 = get_daily_stats(ticker)
             if real_sma200 == 0.0:
                 real_sma200, real_high52, real_low52 = sma50, max(highs), min(lows)
             dist_from_sma200 = ((curr - real_sma200) / real_sma200) * 100 if real_sma200 > 0 else 0
 
-            st.markdown(f"""
-            <div class="longterm-box">
-                <h4 style="margin-top:0; color:#818cf8;">📌 장기 관점 핵심 체크리스트</h4>
-                <p style="margin-bottom:6px;">• <b>실제 1년 이평선(200일선)</b>: ${real_sma200:.2f} (현재가 대비 <b>{dist_from_sma200:+.1f}%</b> 이격)</p>
-                <p style="margin-bottom:6px;">• <b>실제 52주 최고/최저가</b>: 고점 ${real_high52:.2f}  |  저점 ${real_low52:.2f}</p>
-                <hr style="border: 0; border-top: 1px solid #3730a3; margin: 10px 0;">
-                <p style="margin-bottom:0; font-size:0.95rem; line-height:1.5;">
-                    {
-                        "🚨 <b>3배 레버리지 경고</b>: 이 종목은 횡보장·하락 시 '음의 복리'로 계좌가 녹아내릴 수 있습니다. <b>절대 1년 이상 장기 적립하지 마시고, 15분봉 단타나 1~2주 스윙으로만 익절하고 나오세요!</b>"
-                        if is_leveraged else
-                        "🟢 <b>장기 적립식 적합</b>: 1배수 우량주/지수 상품입니다. 200일선 부근으로 눌릴 때마다 적립식으로 분할 매수해 모아가기에 적합합니다."
-                    }
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # 실전 가이드 테이블
-            st.markdown("### 🎯 실전 주문 가이드 (달러 & 원화 기준)")
-            buy_rec_low = min(curr, ema9)
-            buy_rec_high = max(curr, ema9)
-            buy_rec_krw = curr * usd_krw
-
-            st.markdown(f"""
-            <div style="background-color: #1e293b; border: 1.5px solid #3b82f6; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:1.1rem; font-weight:bold; color:#60a5fa;">🎯 매수 권장가 (진입 타점)</span>
-                    <span style="font-size:1.35rem; font-weight:800; color:#38bdf8;">${buy_rec_low:.2f} ~ ${buy_rec_high:.2f}</span>
+            with st.expander("🏛️ 장기 투자 관점 정밀 진단 (200일선 & 52주)", expanded=False):
+                st.markdown(f"""
+                <div class="longterm-box">
+                    <p style="margin-bottom:6px;">• <b>실제 1년선(200일선)</b>: ${real_sma200:.2f} (현재가 대비 <b>{dist_from_sma200:+.1f}%</b> 이격)</p>
+                    <p style="margin-bottom:6px;">• <b>52주 최고/최저</b>: 고점 ${real_high52:.2f}  |  저점 ${real_low52:.2f}</p>
+                    <hr style="border: 0; border-top: 1px solid #3730a3; margin: 8px 0;">
+                    <p style="margin-bottom:0; font-size:0.9rem; line-height:1.4;">
+                        {
+                            "🚨 <b>3배 레버리지 경고</b>: 하락 시 음의 복리로 계좌가 녹아내릴 수 있습니다. 절대 장기 적립하지 마시고 단타/스윙으로만 익절하고 나오세요!"
+                            if is_leveraged else
+                            "🟢 <b>장기 적립식 적합</b>: 1배수 우량주 상품입니다. 200일선 부근 눌림목에서 분할 매수해 모아가기에 적합합니다."
+                        }
+                    </p>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
-                    <span style="font-size:0.85rem; color:#94a3b8;">9선 눌림목 지지 구간 (현재가: ${curr:.2f})</span>
-                    <span style="font-size:1.1rem; font-weight:700; color:#f1f5f9;">약 {buy_rec_krw:,.0f} 원</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            m1, m2 = st.columns(2)
-            with m1:
-                st.metric(f"1차 익절가 (+{target_tp1_pct*100:.1f}%)", f"${tp1:.2f}", f"약 {tp1*usd_krw:,.0f}원")
-                st.metric(f"2차 익절가 (+{target_tp2_pct*100:.1f}%)", f"${tp2:.2f}", f"약 {tp2*usd_krw:,.0f}원")
-            with m2:
-                st.metric("칼손절가 (SL)", f"${sl:.2f}", f"{sl_pct:.2f}% (직전 저점)")
-                st.metric("기대 손익비", f"1 : {rr:.2f}", "검증된 기대치")
-
-            # 세부 지표 상태
-            st.markdown("### 📋 4대 퀀트 지표 정밀 진단")
-            c_col1, c_col2 = st.columns(2)
+                """, unsafe_allow_html=True)
             with c_col1:
                 st.write(f"• **50일선 (SMA 50)**: ${sma50:.2f} ({'🟢 상승' if c1 else '🔴 하락'})")
                 st.write(f"• **이평선 배열**: {'🟢 정배열 골든' if c2 else '🔴 역배열 데드'}")
