@@ -152,6 +152,49 @@ def get_chart_data(symbol, inter, rng):
         return None, "유효 데이터 부족"
     return valid, None
 
+def calc_ema(arr, span):
+    if not arr:
+        return 0.0
+    alpha = 2.0 / (span + 1.0)
+    ema = arr[0]
+    for val in arr[1:]:
+        ema = alpha * val + (1.0 - alpha) * ema
+    return ema
+
+@st.cache_data(ttl=60)
+def scan_radar_opportunities():
+    radar_symbols = ["SOXL", "TQQQ", "TSLA", "NVDA", "AAPL", "AMD", "PLTR", "CONL"]
+    hits = []
+    for s in radar_symbols:
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{s}?interval=15m&range=5d&includePrePost=true"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode())['chart']['result'][0]
+            q = data['indicators']['quote'][0]
+            c = [x for x in q['close'] if x is not None]
+            if len(c) < 30: continue
+            cur_p = c[-1]
+            s50 = sum(c[-50:]) / min(50, len(c))
+            e9 = calc_ema(c, 9)
+            e21 = calc_ema(c, 21)
+            deltas = np.diff(c)
+            gains = np.where(deltas > 0, deltas, 0.0)
+            losses = np.where(deltas < 0, -deltas, 0.0)
+            ag = np.mean(gains[-14:])
+            al = np.mean(losses[-14:])
+            rs_val = ag / (al + 1e-9)
+            r_val = 100.0 - (100.0 / (1.0 + rs_val))
+            c1 = cur_p > s50
+            c2 = e9 > e21
+            c3 = cur_p >= e9
+            c4 = 48.0 <= r_val <= 65.0
+            if sum([c1, c2, c3, c4]) >= 4:
+                hits.append({"symbol": s, "price": cur_p, "rsi": r_val})
+        except Exception:
+            pass
+    return hits
+
 PORTFOLIO_FILE = "portfolio.json"
 JOURNAL_FILE = "trade_journal.json"
 
@@ -251,6 +294,23 @@ with col_ref:
 
 now_kr_str = datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%H:%M:%S")
 st.caption(f"⚡ 실시간 호가 연동 (최근 갱신: 한국 시각 {now_kr_str})")
+
+# 🚨 실시간 퀀트 타점 포착 레이더 배너
+radar_hits = scan_radar_opportunities()
+if radar_hits:
+    hit_texts = " · ".join([f"<b>{h['symbol']}</b> (${h['price']:.2f}, RSI {h['rsi']:.1f})" for h in radar_hits])
+    st.markdown(f"""
+    <div style="background-color: #14532d; border: 1.5px solid #22c55e; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;">
+        <span style="font-size:1.0rem; font-weight:800; color:#86efac;">🚨 [실시간 타점 포착 레이더] 매수 진입 유력 종목 발견!</span><br>
+        <span style="font-size:0.85rem; color:#f0fdf4;">현재 4박자 조건을 충족한 종목: {hit_texts}</span>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 8px 14px; margin-bottom: 10px;">
+        <span style="font-size:0.85rem; color:#94a3b8;">📡 <b>실시간 타점 레이더</b>: 현재 주요 주도주 과열/대기 중 (안전한 4박자 타점 포착 시 즉시 배너 표시)</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==============================================================================
 # 🔥 [상시 고정] 내 실시간 보유 주식 요약 바 (어떤 화면에서도 항상 보임)
@@ -574,13 +634,6 @@ with tab_analysis:
 
             curr = closes[-1]
             prev_low = lows[-2] if len(lows) >= 2 else lows[-1]
-
-            def calc_ema(arr, span):
-                alpha = 2.0 / (span + 1.0)
-                ema = arr[0]
-                for val in arr[1:]:
-                    ema = alpha * val + (1.0 - alpha) * ema
-                return ema
 
             sma50 = sum(closes[-50:]) / min(50, len(closes))
             ema9 = calc_ema(closes, 9)
