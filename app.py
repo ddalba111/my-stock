@@ -305,28 +305,20 @@ with tab_portfolio:
 # TAB 2: 종목별 퀀트 타점 분석기
 # ------------------------------------------------------------------------------
 with tab_analysis:
-    st.write("🔥 **인기 종목 빠른 선택**")
-    row1_col1, row1_col2, row1_col3, row1_col4 = st.columns(4)
-    row2_col1, row2_col2, row2_col3, row2_col4 = st.columns(4)
+    st.write("💼 **내 보유 종목 빠른 선택**")
+    active_stocks = [s for s, inf in st.session_state.my_portfolio.items() if inf.get("shares", 0) > 0]
 
     selected_quick = None
-    with row1_col1:
-        if st.button("SOXL", key="q_soxl"): selected_quick = "SOXL"
-    with row1_col2:
-        if st.button("TQQQ", key="q_tqqq"): selected_quick = "TQQQ"
-    with row1_col3:
-        if st.button("TSLA", key="q_tsla"): selected_quick = "TSLA"
-    with row1_col4:
-        if st.button("NVDA", key="q_nvda"): selected_quick = "NVDA"
-
-    with row2_col1:
-        if st.button("AMD", key="q_amd"): selected_quick = "AMD"
-    with row2_col2:
-        if st.button("PLTR", key="q_pltr"): selected_quick = "PLTR"
-    with row2_col3:
-        if st.button("AAPL", key="q_aapl"): selected_quick = "AAPL"
-    with row2_col4:
-        if st.button("CONL", key="q_conl"): selected_quick = "CONL"
+    if active_stocks:
+        cols = st.columns(min(len(active_stocks), 4))
+        for idx, s_ticker in enumerate(active_stocks):
+            col = cols[idx % len(cols)]
+            with col:
+                sh_count = st.session_state.my_portfolio[s_ticker].get("shares", 0)
+                if st.button(f"🔥 {s_ticker} ({sh_count}주)", key=f"btn_my_{s_ticker}", use_container_width=True):
+                    selected_quick = s_ticker
+    else:
+        st.info("💡 등록된 보유 종목이 없습니다. '💼 내 보유 주식만 보기' 탭에서 종목을 등록하시면 여기에 빠른 분석 버튼이 생성됩니다!")
 
     if selected_quick:
         st.session_state.current_ticker = selected_quick
