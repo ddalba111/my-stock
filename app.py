@@ -195,6 +195,35 @@ def scan_radar_opportunities():
             pass
     return hits
 
+@st.cache_data(ttl=300)
+def get_fear_and_greed():
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://www.cnn.com/markets/fear-and-greed',
+        'Origin': 'https://www.cnn.com'
+    }
+    try:
+        url = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata'
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=4) as r:
+            d = json.loads(r.read().decode())
+            score = round(d['fear_and_greed']['score'], 1)
+            rating = d['fear_and_greed']['rating'].lower()
+            if "extreme fear" in rating:
+                return score, "😱 극단적 공포 (바닥 매수 찬스)", "#60a5fa", "#1e3a8a"
+            elif "fear" in rating:
+                return score, "😨 공포 (시장 위축 구간)", "#93c5fd", "#1e293b"
+            elif "neutral" in rating:
+                return score, "😐 중립 (관망 구간)", "#facc15", "#713f12"
+            elif "extreme greed" in rating:
+                return score, "🔥 극단적 탐욕 (고점 과열 경보)", "#f87171", "#7f1d1d"
+            else:
+                return score, "🤑 탐욕 (상승 모멘텀)", "#4ade80", "#14532d"
+    except Exception:
+        pass
+    return 38.0, "😨 공포 (시장 위축 구간)", "#93c5fd", "#1e293b"
+
 PORTFOLIO_FILE = "portfolio.json"
 JOURNAL_FILE = "trade_journal.json"
 
@@ -300,17 +329,28 @@ radar_hits = scan_radar_opportunities()
 if radar_hits:
     hit_texts = " · ".join([f"<b>{h['symbol']}</b> (${h['price']:.2f}, RSI {h['rsi']:.1f})" for h in radar_hits])
     st.markdown(f"""
-    <div style="background-color: #14532d; border: 1.5px solid #22c55e; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;">
+    <div style="background-color: #14532d; border: 1.5px solid #22c55e; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
         <span style="font-size:1.0rem; font-weight:800; color:#86efac;">🚨 [실시간 타점 포착 레이더] 매수 진입 유력 종목 발견!</span><br>
         <span style="font-size:0.85rem; color:#f0fdf4;">현재 4박자 조건을 충족한 종목: {hit_texts}</span>
     </div>
     """, unsafe_allow_html=True)
 else:
     st.markdown(f"""
-    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 8px 14px; margin-bottom: 10px;">
+    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
         <span style="font-size:0.85rem; color:#94a3b8;">📡 <b>실시간 타점 레이더</b>: 현재 주요 주도주 과열/대기 중 (안전한 4박자 타점 포착 시 즉시 배너 표시)</span>
     </div>
     """, unsafe_allow_html=True)
+
+# 🧠 월가 공포 & 탐욕 지수 (Fear & Greed Index)
+fg_score, fg_label, fg_color, fg_bg = get_fear_and_greed()
+st.markdown(f"""
+<div style="background-color: {fg_bg}; border: 1px solid {fg_color}; border-radius: 10px; padding: 8px 14px; margin-bottom: 12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.9rem; font-weight:bold; color:#cbd5e1;">🧠 월가 공포 & 탐욕 지수</span>
+        <span style="font-size:1.05rem; font-weight:800; color:{fg_color};">{fg_score:.0f}점 · {fg_label}</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ==============================================================================
 # 🔥 [상시 고정] 내 실시간 보유 주식 요약 바 (어떤 화면에서도 항상 보임)
@@ -484,6 +524,45 @@ with tab_portfolio:
 
                     st.success(f"{s_sym} {sell_shares}주 익절 기록 완료!")
                     st.rerun()
+
+        # ----------------------------------------------------------------------
+        # 🎮 시드 2배 복리 퀘스트 로드맵 (500만 ➔ 1,000만 원)
+        # ----------------------------------------------------------------------
+        st.markdown("---")
+        st.subheader("🎮 시드 2배 복리 퀘스트 (500만 ➔ 1,000만 원)")
+        journal_entries = load_journal()
+        tot_realized_krw = sum(x.get("profit_krw", 0) for x in journal_entries)
+        win_trades = len([x for x in journal_entries if x.get("profit_krw", 0) > 0])
+
+        base_seed = 5000000
+        target_seed = 10000000
+        current_asset = base_seed + tot_realized_krw
+        progress_val = min(1.0, max(0.0, tot_realized_krw / (target_seed - base_seed)))
+        progress_pct = progress_val * 100
+        trades_left = max(0, 20 - win_trades)
+        remaining_krw = max(0, target_seed - current_asset)
+        level_num = min(20, win_trades)
+
+        st.markdown(f"""
+        <div style="background-color: #1e1b4b; border: 1.5px solid #6366f1; border-radius: 12px; padding: 16px; margin-bottom: 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:1.15rem; font-weight:bold; color:#c7d2fe;">🏆 LEVEL {level_num} : 1,000만 원 로드맵</span>
+                <span style="font-size:1.25rem; font-weight:800; color:#a5b4fc;">{progress_pct:.1f}% 달성</span>
+            </div>
+            <div style="margin: 10px 0 6px 0;">
+                <div style="background-color: #312e81; border-radius: 8px; height: 14px; overflow: hidden;">
+                    <div style="background: linear-gradient(90deg, #6366f1, #a855f7); width: {max(5, int(progress_pct))}%; height: 100%;"></div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#e0e7ff; margin-top:6px;">
+                <span>현재 자산: <b>{current_asset:,.0f} 원</b> ({'+' if tot_realized_krw>=0 else ''}{tot_realized_krw:,.0f}원)</span>
+                <span>목표: <b>10,000,000 원</b></span>
+            </div>
+            <div style="margin-top:8px; font-size:0.85rem; color:#a5b4fc; background-color:#2e1065; padding:8px 12px; border-radius:8px;">
+                🎯 <b>퀘스트 현황</b>: 1회당 +3.5% 익절 기준 앞으로 <b>{trades_left}회 익절 성공 시</b> 1,000만 원 2배 달성 완료! (남은 목표액: {remaining_krw:,.0f}원)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         # 2. 누적 실현 손익 장부
         st.markdown("---")
