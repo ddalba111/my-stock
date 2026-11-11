@@ -861,11 +861,5 @@ with tab_analysis:
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
-            with c_col1:
-                st.write(f"• **50일선 (SMA 50)**: ${sma50:.2f} ({'🟢 상승' if c1 else '🔴 하락'})")
-                st.write(f"• **이평선 배열**: {'🟢 정배열 골든' if c2 else '🔴 역배열 데드'}")
-            with c_col2:
-                st.write(f"• **RSI (14)**: {rsi:.1f} ({'🟢 탄력' if c4 else '⚠️ 과열/침체'})")
-                st.write(f"• **거래량 급증비**: {vol_ratio:.2f}배 ({'🟢 급증' if c5 else '⚪ 평이'})")
 
 st.caption(f"적용 환율: $1 = {usd_krw:,.1f}원 | 실시간 캔들 기준 (한국 시각 {datetime.now(zoneinfo.ZoneInfo('Asia/Seoul')).strftime('%H:%M:%S')})")
