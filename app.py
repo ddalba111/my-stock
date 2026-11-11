@@ -265,10 +265,11 @@ if ticker:
             </div>
             """, unsafe_allow_html=True)
 
-        # 1. 트레이딩뷰 실시간 프로 차트
+        # 1. 트레이딩뷰 실시간 프로 차트 (4대 퀀트 보조지표 기본 탑재)
         st.markdown(f"### 📺 실시간 프로 차트 ({ticker})")
+        st.caption("💡 캔들 위 이동평균선(MA)과 아래 RSI 지표가 차트에 기본 탑재되어 있으며, 상단 '지표(fx)' 메뉴에서 원하는 지표를 자유롭게 추가할 수 있습니다.")
         tv_html = f"""
-        <div class="tradingview-widget-container" style="height:390px;width:100%;">
+        <div class="tradingview-widget-container" style="height:420px;width:100%;">
           <div id="tradingview_{ticker}" style="height:100%;width:100%;"></div>
           <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
           <script type="text/javascript">
@@ -284,14 +285,20 @@ if ticker:
             "toolbar_bg": "#0e1117",
             "enable_publishing": false,
             "allow_symbol_change": false,
+            "hide_top_toolbar": false,
+            "hide_legend": false,
             "save_image": false,
+            "studies": [
+              "MASimple@tv-basicstudies",
+              "RSI@tv-basicstudies"
+            ],
             "container_id": "tradingview_{ticker}"
           }}
           );
           </script>
         </div>
         """
-        components.html(tv_html, height=400)
+        components.html(tv_html, height=430)
 
         # 2. 토스증권 바로가기 버튼
         toss_url = f"https://tossinvest.com/stocks/{ticker}"
