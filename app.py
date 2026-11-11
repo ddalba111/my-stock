@@ -384,21 +384,46 @@ with tab_portfolio:
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button(f"🎉 {s_sym} 익절 완료 기록 (장부에 저장)", key=f"rec_btn_{s_sym}", use_container_width=True):
-                j_list = load_journal()
-                j_list.insert(0, {
-                    "date": datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M"),
-                    "symbol": s_sym,
-                    "shares": s_shares,
-                    "sell_price": s_live,
-                    "profit_krw": int(s_krw),
-                    "profit_usd": round(s_pnl, 2),
-                    "pct": round(s_pct, 2),
-                    "note": f"${s_live:.2f} 매도 확정"
-                })
-                save_journal(j_list)
-                st.success(f"{s_sym} {s_shares}주 익절 기록 완료!")
-                st.rerun()
+            with st.expander(f"📝 {s_sym} 익절/매도 기록하기 (수량 & 단가 직접 설정)", expanded=False):
+                col_j1, col_j2 = st.columns(2)
+                with col_j1:
+                    sell_shares = st.number_input(f"매도할 수량 (최대 {s_shares}주)", min_value=1, max_value=s_shares, value=s_shares, step=1, key=f"s_sh_{s_sym}")
+                    auto_deduct = st.checkbox("내 보유 수량에서 차감하기", value=True, key=f"deduct_{s_sym}")
+                with col_j2:
+                    sell_price = st.number_input("실제 매도 단가 ($)", min_value=0.01, value=float(round(s_live, 2)), step=0.1, format="%.2f", key=f"s_pr_{s_sym}")
+
+                calc_usd = (sell_price - s_avg) * sell_shares
+                calc_krw = calc_usd * usd_krw
+                calc_pct = ((sell_price - s_avg) / s_avg) * 100 if s_avg > 0 else 0
+                sign_calc = "+" if calc_usd >= 0 else ""
+
+                st.caption(f"확정 실현 손익: **{sign_calc}${calc_usd:.2f} ({sign_calc}{calc_krw:,.0f}원, {sign_calc}{calc_pct:.2f}%)**")
+
+                if st.button(f"💾 {s_sym} {sell_shares}주 @ ${sell_price:.2f} 장부에 저장", key=f"save_j_{s_sym}", type="primary", use_container_width=True):
+                    j_list = load_journal()
+                    j_list.insert(0, {
+                        "date": datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M"),
+                        "symbol": s_sym,
+                        "shares": int(sell_shares),
+                        "buy_price": round(s_avg, 2),
+                        "sell_price": round(sell_price, 2),
+                        "profit_krw": int(calc_krw),
+                        "profit_usd": round(calc_usd, 2),
+                        "pct": round(calc_pct, 2),
+                        "note": f"평단 ${s_avg:.2f} → 매도 ${sell_price:.2f}"
+                    })
+                    save_journal(j_list)
+
+                    if auto_deduct:
+                        rem = s_shares - sell_shares
+                        if rem > 0:
+                            st.session_state.my_portfolio[s_sym]["shares"] = rem
+                        else:
+                            del st.session_state.my_portfolio[s_sym]
+                        save_portfolio(st.session_state.my_portfolio)
+
+                    st.success(f"{s_sym} {sell_shares}주 익절 기록 완료!")
+                    st.rerun()
 
         # 2. 누적 실현 손익 장부
         st.markdown("---")
@@ -422,20 +447,33 @@ with tab_portfolio:
             </div>
             """, unsafe_allow_html=True)
 
-            for j in journal_entries[:5]:
+            for idx, j in enumerate(journal_entries):
                 p_c = "#4ade80" if j.get("profit_krw", 0) >= 0 else "#f87171"
                 p_s = "+" if j.get("profit_krw", 0) >= 0 else ""
-                st.markdown(f"""
-                <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span style="font-weight:bold; color:white;">{j.get('symbol')} ({j.get('shares')}주 @ ${j.get('sell_price'):.2f})</span>
-                        <span style="font-weight:bold; color:{p_c};">{p_s}{j.get('profit_krw'):,.0f}원 ({p_s}{j.get('pct')}%)</span>
+                col_rec, col_del = st.columns([5, 1])
+                with col_rec:
+                    st.markdown(f"""
+                    <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="font-weight:bold; color:white;">{j.get('symbol')} ({j.get('shares')}주 @ ${j.get('sell_price'):.2f})</span>
+                            <span style="font-weight:bold; color:{p_c};">{p_s}{j.get('profit_krw'):,.0f}원 ({p_s}{j.get('pct')}%)</span>
+                        </div>
+                        <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+                            {j.get('date')} · {j.get('note', '')}
+                        </div>
                     </div>
-                    <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
-                        {j.get('date')} · {j.get('note', '')}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+                with col_del:
+                    st.write("")
+                    if st.button("🗑️", key=f"del_rec_{idx}", help="이 기록 삭제"):
+                        journal_entries.pop(idx)
+                        save_journal(journal_entries)
+                        st.rerun()
+
+            if st.button("⚠️ 장부 전체 기록 삭제", type="secondary"):
+                save_journal([])
+                st.success("장부의 모든 기록이 삭제되었습니다.")
+                st.rerun()
     else:
         st.write("아직 등록된 보유 종목이 없습니다.")
 
