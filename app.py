@@ -153,6 +153,25 @@ def get_chart_data(symbol, inter, rng):
     return valid, None
 
 PORTFOLIO_FILE = "portfolio.json"
+JOURNAL_FILE = "trade_journal.json"
+
+def load_journal():
+    if os.path.exists(JOURNAL_FILE):
+        try:
+            with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                if isinstance(d, list):
+                    return d
+        except Exception:
+            pass
+    return []
+
+def save_journal(data):
+    try:
+        with open(JOURNAL_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 def parse_portfolio_from_params():
     try:
@@ -276,7 +295,7 @@ bar_sign = "+" if is_total_profit else ""
 if portfolio_items:
     item_summaries = " · ".join([f"<b>{item['symbol']}</b> {item['shares']}주 (${item['live_price']:.2f})" for item in portfolio_items])
     st.markdown(f"""
-    <div style="background-color: {bar_bg}; border: 1px solid {bar_border}; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px;">
+    <div style="background-color: {bar_bg}; border: 1px solid {bar_border}; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:0.95rem; font-weight:bold; color:#e2e8f0;">💼 내 실시간 총 손익</span>
             <span style="font-size:1.25rem; font-weight:800; color:{bar_color};">{bar_sign}${total_pnl_usd:.2f} ({bar_sign}{total_pnl_pct:.2f}%)</span>
@@ -287,6 +306,34 @@ if portfolio_items:
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # 1. 실시간 익절/손절 도달 알림 배너
+    for item in portfolio_items:
+        i_sym = item['symbol']
+        i_pct = item['pnl_pct']
+        i_pnl_krw = item['pnl_usd'] * usd_krw
+        i_live = item['live_price']
+        if i_pct >= 7.0:
+            st.markdown(f"""
+            <div style="background-color: #064e3b; border: 1.5px solid #10b981; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
+                <span style="font-size:1.0rem; font-weight:800; color:#6ee7b7;">🎉 [익절 신호] {i_sym} 2차 목표가(+7.0%) 돌파 완료!</span><br>
+                <span style="font-size:0.85rem; color:#e2e8f0;">현재가 ${i_live:.2f} (수익률 <b>+{i_pct:.2f}%</b>, 평가익 <b>+{i_pnl_krw:,.0f}원</b>) — 50% 분할 익절 또는 전량 익절 타이밍입니다!</span>
+            </div>
+            """, unsafe_allow_html=True)
+        elif i_pct >= 3.5:
+            st.markdown(f"""
+            <div style="background-color: #1e3a8a; border: 1.5px solid #3b82f6; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
+                <span style="font-size:1.0rem; font-weight:800; color:#93c5fd;">🎯 [익절 신호] {i_sym} 1차 목표가(+3.5%) 도달!</span><br>
+                <span style="font-size:0.85rem; color:#e2e8f0;">현재가 ${i_live:.2f} (수익률 <b>+{i_pct:.2f}%</b>, 평가익 <b>+{i_pnl_krw:,.0f}원</b>) — 50% 분할 매도로 수익을 확정하세요!</span>
+            </div>
+            """, unsafe_allow_html=True)
+        elif i_pct <= -1.8:
+            st.markdown(f"""
+            <div style="background-color: #7f1d1d; border: 1.5px solid #ef4444; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
+                <span style="font-size:1.0rem; font-weight:800; color:#fca5a5;">⚠️ [손절 경고] {i_sym} 손절 기준선(-1.8%) 이탈!</span><br>
+                <span style="font-size:0.85rem; color:#fecaca;">현재가 ${i_live:.2f} (손실률 <b>{i_pct:.2f}%</b>) — 원금 보존을 위해 칼손절을 권장합니다!</span>
+            </div>
+            """, unsafe_allow_html=True)
 else:
     st.info("💡 등록된 보유 주식이 없습니다. 아래 '💼 내 보유 잔고' 탭에서 종목과 수량을 등록하세요!")
 
@@ -336,6 +383,59 @@ with tab_portfolio:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+            if st.button(f"🎉 {s_sym} 익절 완료 기록 (장부에 저장)", key=f"rec_btn_{s_sym}", use_container_width=True):
+                j_list = load_journal()
+                j_list.insert(0, {
+                    "date": datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M"),
+                    "symbol": s_sym,
+                    "shares": s_shares,
+                    "sell_price": s_live,
+                    "profit_krw": int(s_krw),
+                    "profit_usd": round(s_pnl, 2),
+                    "pct": round(s_pct, 2),
+                    "note": f"${s_live:.2f} 매도 확정"
+                })
+                save_journal(j_list)
+                st.success(f"{s_sym} {s_shares}주 익절 기록 완료!")
+                st.rerun()
+
+        # 2. 누적 실현 손익 장부
+        st.markdown("---")
+        st.subheader("💰 이번 달 누적 실현 손익 (익절 장부)")
+        journal_entries = load_journal()
+        if journal_entries:
+            tot_realized_krw = sum(x.get("profit_krw", 0) for x in journal_entries)
+            tot_realized_usd = sum(x.get("profit_usd", 0.0) for x in journal_entries)
+            j_color = "#4ade80" if tot_realized_krw >= 0 else "#f87171"
+            j_sign = "+" if tot_realized_krw >= 0 else ""
+
+            st.markdown(f"""
+            <div style="background-color: #1a1e29; border: 1px solid #3b82f6; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:1.0rem; font-weight:bold; color:#93c5fd;">총 누적 확정 수익금</span>
+                    <span style="font-size:1.35rem; font-weight:800; color:{j_color};">{j_sign}{tot_realized_krw:,.0f} 원</span>
+                </div>
+                <div style="text-align:right; font-size:0.9rem; color:#cbd5e1; margin-top:2px;">
+                    {j_sign}${tot_realized_usd:.2f} (총 {len(journal_entries)}회 매매 확정)
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            for j in journal_entries[:5]:
+                p_c = "#4ade80" if j.get("profit_krw", 0) >= 0 else "#f87171"
+                p_s = "+" if j.get("profit_krw", 0) >= 0 else ""
+                st.markdown(f"""
+                <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="font-weight:bold; color:white;">{j.get('symbol')} ({j.get('shares')}주 @ ${j.get('sell_price'):.2f})</span>
+                        <span style="font-weight:bold; color:{p_c};">{p_s}{j.get('profit_krw'):,.0f}원 ({p_s}{j.get('pct')}%)</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+                        {j.get('date')} · {j.get('note', '')}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
     else:
         st.write("아직 등록된 보유 종목이 없습니다.")
 
@@ -563,25 +663,6 @@ with tab_analysis:
                 </p>
             </div>
             """, unsafe_allow_html=True)
-
-            # 시드별 매수 주수 & 원화 익절 계산기
-            st.markdown(f"### 🧮 시드별 매수 주수 & 원화 익절 계산기 ({mode_name})")
-            seed_money = st.number_input("내 투자 가능 시드 (원)", min_value=100000, max_value=50000000, value=1500000, step=100000)
-
-            shares_possible = int(seed_money // curr_krw) if curr_krw > 0 else 0
-            actual_invest_krw = shares_possible * curr_krw
-
-            total_tp1_profit = shares_possible * tp1_diff_krw
-            total_tp2_profit = shares_possible * tp2_diff_krw
-            total_sl_loss = shares_possible * sl_diff_krw
-
-            c_calc1, c_calc2 = st.columns(2)
-            with c_calc1:
-                st.metric("권장 매수 수량", f"{shares_possible} 주", f"총 {actual_invest_krw:,.0f}원")
-                st.metric(f"1차 익절 순수익 (+{target_tp1_pct*100:.1f}%)", f"+{total_tp1_profit:,.0f} 원", f"주당 +{tp1_diff_krw:,.0f}원")
-            with c_calc2:
-                st.metric(f"칼손절 시 감수액 ({sl_pct:.1f}%)", f"-{total_sl_loss:,.0f} 원", "원금 철저 방어")
-                st.metric(f"2차 익절 순수익 (+{target_tp2_pct*100:.1f}%)", f"+{total_tp2_profit:,.0f} 원", f"주당 +{tp2_diff_krw:,.0f}원")
 
             # 실전 가이드 테이블
             st.markdown("### 🎯 실전 주문 가이드 (달러 & 원화 기준)")
