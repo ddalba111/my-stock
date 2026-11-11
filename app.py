@@ -727,8 +727,11 @@ with tab_analysis:
             rs = avg_gain / (avg_loss + 1e-9)
             rsi = 100.0 - (100.0 / (1.0 + rs))
 
-            vol_ma20 = np.mean(vols[-21:-1]) if len(vols) > 20 else vols[-1]
-            vol_ratio = (vols[-1] / (vol_ma20 + 1e-9))
+            # 실시간 미완성 봉의 거래량이 0이면 직전 완성봉 참조
+            target_vol = vols[-1] if (vols and vols[-1] > 0) else (vols[-2] if len(vols) >= 2 else 0)
+            past_vols = [v for v in vols[-22:-1] if v > 0] if len(vols) >= 2 else [target_vol]
+            vol_base = float(np.median(past_vols)) if past_vols else float(target_vol)
+            vol_ratio = float(target_vol / (vol_base + 1e-9)) if vol_base > 0 else 1.0
 
             c1 = curr > sma50
             c2 = ema9 > ema21
