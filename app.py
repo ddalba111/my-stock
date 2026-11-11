@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import urllib.request
 import json
 import math
+import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -151,11 +152,29 @@ def get_chart_data(symbol, inter, rng):
         return None, "유효 데이터 부족"
     return valid, None
 
-# 세션 상태 초기화
+PORTFOLIO_FILE = "portfolio.json"
+
+def load_portfolio():
+    if os.path.exists(PORTFOLIO_FILE):
+        try:
+            with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                if isinstance(d, dict) and d:
+                    return d
+        except Exception:
+            pass
+    return {"SOXL": {"shares": 15, "avg_price": 63.56}}
+
+def save_portfolio(data):
+    try:
+        with open(PORTFOLIO_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.error(f"영구 저장 중 오류: {e}")
+
+# 세션 상태 초기화 (영구 파일에서 로드)
 if "my_portfolio" not in st.session_state:
-    st.session_state.my_portfolio = {
-        "SOXL": {"shares": 15, "avg_price": 63.56}
-    }
+    st.session_state.my_portfolio = load_portfolio()
 
 if "current_ticker" not in st.session_state:
     st.session_state.current_ticker = "SOXL"
@@ -294,10 +313,12 @@ with tab_portfolio:
             if edit_sym:
                 if edit_shares > 0:
                     st.session_state.my_portfolio[edit_sym] = {"shares": edit_shares, "avg_price": edit_avg}
-                    st.success(f"{edit_sym} {edit_shares}주 (${edit_avg:.2f}) 저장 완료!")
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.success(f"{edit_sym} {edit_shares}주 (${edit_avg:.2f}) 영구 저장 완료!")
                 else:
                     if edit_sym in st.session_state.my_portfolio:
                         del st.session_state.my_portfolio[edit_sym]
+                        save_portfolio(st.session_state.my_portfolio)
                         st.warning(f"{edit_sym} 삭제 완료!")
                 st.rerun()
 
