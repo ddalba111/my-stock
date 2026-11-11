@@ -92,7 +92,22 @@ def get_usd_krw_rate():
 
 usd_krw = get_usd_krw_rate()
 
-# 실시간 단일 주가 조회 함수
+# 시장 상태 판별 함수 (한국 시간 기준)
+def get_market_status():
+    now_kst = datetime.now(zoneinfo.ZoneInfo("Asia/Seoul"))
+    h = now_kst.hour
+    m = now_kst.minute
+    total_m = h * 60 + m
+    if total_m >= 23 * 60 + 30 or total_m < 6 * 60:
+        return "🟢 정규장 실시간"
+    elif 6 * 60 <= total_m < 10 * 60:
+        return "🌙 애프터마켓 실시간"
+    elif 10 * 60 <= total_m < 18 * 60:
+        return "⏸️ 미국 증시 휴장"
+    else:
+        return "🌅 프리마켓 실시간"
+
+# 실시간 단일 주가 조회 함수 (프리마켓/정규장/애프터마켓 전구간 실시간 반영)
 @st.cache_data(ttl=15)
 def get_live_price(symbol):
     try:
@@ -100,8 +115,15 @@ def get_live_price(symbol):
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode())['chart']['result'][0]
-        c = [x for x in data['indicators']['quote'][0]['close'] if x is not None]
-        return float(c[-1]) if c else 0.0
+        meta = data.get('meta', {})
+        quotes = data['indicators']['quote'][0]
+        c = [x for x in quotes['close'] if x is not None]
+        if c:
+            return float(c[-1])
+        reg = meta.get('regularMarketPrice')
+        if reg:
+            return float(reg)
+        return 0.0
     except Exception:
         return 0.0
 
@@ -279,18 +301,23 @@ def sync_portfolio_to_params(data):
         pass
 
 def load_portfolio():
-    param_data = parse_portfolio_from_params()
-    if param_data is not None:
-        return param_data
     if os.path.exists(PORTFOLIO_FILE):
         try:
             with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
                 d = json.load(f)
-                if isinstance(d, dict):
+                if isinstance(d, dict) and len(d) > 0:
                     return d
         except Exception:
             pass
-    return {}
+    param_data = parse_portfolio_from_params()
+    if param_data is not None:
+        return param_data
+    return {
+        "SOXL": {"shares": 20, "avg_price": 66.10},
+        "TQQQ": {"shares": 15, "avg_price": 60.03},
+        "TSLA": {"shares": 1, "avg_price": 393.02},
+        "NVDA": {"shares": 2, "avg_price": 174.93}
+    }
 
 def save_portfolio(data):
     try:
@@ -368,35 +395,39 @@ bar_sign = "+" if is_total_profit else ""
 
 fg_score, fg_label, fg_color, fg_bg = get_fear_and_greed()
 radar_hits = scan_radar_opportunities()
+market_badge = get_market_status()
 
 if portfolio_items:
     item_summaries = " · ".join([f"<b>{item['symbol']}</b> {item['shares']}주 (${item['live_price']:.2f})" for item in portfolio_items])
-    st.markdown(f"""
-    <div style="background-color: {bar_bg}; border: 1px solid {bar_border}; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:0.95rem; font-weight:bold; color:#e2e8f0;">💼 실시간 총 손익</span>
-            <span style="font-size:1.25rem; font-weight:800; color:{bar_color};">{bar_sign}${total_pnl_usd:.2f} ({bar_sign}{total_pnl_pct:.2f}%)</span>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-            <span style="font-size:0.85rem; color:#cbd5e1;">{item_summaries}</span>
-            <span style="font-size:1.15rem; font-weight:800; color:{bar_color};">{bar_sign}{total_pnl_krw:,.0f} 원</span>
-        </div>
-        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.12); margin: 8px 0 6px 0;">
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#cbd5e1;">
-            <span>🧠 월가 심리: <b style="color:{fg_color};">{fg_score:.0f}점 {fg_label.split()[1] if len(fg_label.split())>1 else ''}</b></span>
-            <span>📡 타점 레이더: <b>{'🚨 타점 포착!' if radar_hits else '안전 관망 중'}</b></span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    top_bar_html = (
+        f'<div style="background-color: {bar_bg}; border: 1px solid {bar_border}; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">'
+        f'<div style="display:flex; justify-content:space-between; align-items:center;">'
+        f'<span style="font-size:0.95rem; font-weight:bold; color:#e2e8f0;">💼 실시간 총 손익</span>'
+        f'<span style="font-size:1.25rem; font-weight:800; color:{bar_color};">{bar_sign}${total_pnl_usd:.2f} ({bar_sign}{total_pnl_pct:.2f}%)</span>'
+        f'</div>'
+        f'<div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">'
+        f'<span style="font-size:0.85rem; color:#cbd5e1;">{item_summaries}</span>'
+        f'<span style="font-size:1.15rem; font-weight:800; color:{bar_color};">{bar_sign}{total_pnl_krw:,.0f} 원</span>'
+        f'</div>'
+        f'<hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.12); margin: 8px 0 6px 0;">'
+        f'<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#cbd5e1;">'
+        f'<span>🧠 월가 심리: <b style="color:{fg_color};">{fg_score:.0f}점 {fg_label.split()[1] if len(fg_label.split())>1 else ""}</b></span>'
+        f'<span>{market_badge}</span>'
+        f'<span>📡 타점: <b>{"🚨 포착!" if radar_hits else "안전 관망"}</b></span>'
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(top_bar_html, unsafe_allow_html=True)
 else:
-    st.markdown(f"""
-    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:0.9rem; color:#94a3b8;">💼 등록된 보유 주식 없음</span>
-            <span style="font-size:0.8rem; color:#cbd5e1;">🧠 심리: <b style="color:{fg_color};">{fg_score:.0f}점</b></span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    no_port_html = (
+        f'<div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">'
+        f'<div style="display:flex; justify-content:space-between; align-items:center;">'
+        f'<span style="font-size:0.9rem; color:#94a3b8;">💼 등록된 보유 주식 없음</span>'
+        f'<span style="font-size:0.8rem; color:#cbd5e1;">{market_badge} · 🧠 심리: <b style="color:{fg_color};">{fg_score:.0f}점</b></span>'
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(no_port_html, unsafe_allow_html=True)
 
 # 🚦 내 보유 종목 실시간 신호등 바 (모바일 네이티브 스타일)
 if portfolio_items:
@@ -424,23 +455,24 @@ if portfolio_items:
             status_color = "#f87171"
 
         sign = "+" if pct >= 0 else ""
-        cards_html.append(f"""
-        <div style="flex:1; min-width:70px; background-color:#1e293b; border-radius:8px; padding:8px 4px; text-align:center; border:1px solid rgba(255,255,255,0.08);">
-            <div style="font-size:0.8rem; font-weight:bold; color:white;">{light} {sym}</div>
-            <div style="font-size:0.95rem; font-weight:800; color:{status_color}; margin:2px 0;">{sign}{pct:.1f}%</div>
-            <div style="font-size:0.7rem; color:#94a3b8;">{status_text}</div>
-        </div>
-        """)
+        card_item = (
+            f'<div style="flex:1; min-width:70px; background-color:#1e293b; border-radius:8px; padding:8px 4px; text-align:center; border:1px solid rgba(255,255,255,0.08);">'
+            f'<div style="font-size:0.8rem; font-weight:bold; color:white;">{light} {sym}</div>'
+            f'<div style="font-size:0.95rem; font-weight:800; color:{status_color}; margin:2px 0;">{sign}{pct:.1f}%</div>'
+            f'<div style="font-size:0.7rem; color:#94a3b8;">{status_text}</div>'
+            f'</div>'
+        )
+        cards_html.append(card_item)
 
     all_cards = "".join(cards_html)
-    st.markdown(f"""
-    <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;">
-        <div style="font-size:0.8rem; font-weight:bold; color:#94a3b8; margin-bottom:6px;">🚦 내 보유 종목 실시간 신호등</div>
-        <div style="display:flex; gap:6px; justify-content:space-between; overflow-x:auto;">
-            {all_cards}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;">'
+        f'<div style="font-size:0.8rem; font-weight:bold; color:#94a3b8; margin-bottom:6px;">🚦 내 보유 종목 실시간 신호등</div>'
+        f'<div style="display:flex; gap:6px; justify-content:space-between; overflow-x:auto;">'
+        f'{all_cards}'
+        f'</div></div>',
+        unsafe_allow_html=True
+    )
 
 # 레이더 타점 포착 시에만 특별 배너 표시
 if radar_hits:
@@ -486,7 +518,20 @@ tab_portfolio, tab_analysis = st.tabs(["💼 내 보유 주식만 보기", "📈
 # ------------------------------------------------------------------------------
 with tab_portfolio:
     st.subheader("💼 내 실시간 보유 잔고 포트폴리오")
-    st.caption("내가 매수한 종목들의 실시간 평가 손익과 원화 수익금을 한눈에 확인합니다.")
+    col_cap, col_reset = st.columns([3, 2])
+    with col_cap:
+        st.caption("내가 매수한 종목들의 실시간 평가 손익과 원화 수익금을 한눈에 확인합니다.")
+    with col_reset:
+        if st.button("🔄 토스 원본(20주/15주) 복원", use_container_width=True):
+            default_data = {
+                "SOXL": {"shares": 20, "avg_price": 66.10},
+                "TQQQ": {"shares": 15, "avg_price": 60.03},
+                "TSLA": {"shares": 1, "avg_price": 393.02},
+                "NVDA": {"shares": 2, "avg_price": 174.93}
+            }
+            st.session_state.my_portfolio = default_data
+            save_portfolio(default_data)
+            st.rerun()
 
     if portfolio_items:
         col_t1, col_t2 = st.columns(2)
