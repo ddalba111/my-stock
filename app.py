@@ -584,11 +584,28 @@ with tab_analysis:
                 st.metric(f"2차 익절 순수익 (+{target_tp2_pct*100:.1f}%)", f"+{total_tp2_profit:,.0f} 원", f"주당 +{tp2_diff_krw:,.0f}원")
 
             # 실전 가이드 테이블
-            st.markdown("### 🎯 실전 주문 가이드 (달러 기준)")
+            st.markdown("### 🎯 실전 주문 가이드 (달러 & 원화 기준)")
+            buy_rec_low = min(curr, ema9)
+            buy_rec_high = max(curr, ema9)
+            buy_rec_krw = curr * usd_krw
+
+            st.markdown(f"""
+            <div style="background-color: #1e293b; border: 1.5px solid #3b82f6; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:1.1rem; font-weight:bold; color:#60a5fa;">🎯 매수 권장가 (진입 타점)</span>
+                    <span style="font-size:1.35rem; font-weight:800; color:#38bdf8;">${buy_rec_low:.2f} ~ ${buy_rec_high:.2f}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                    <span style="font-size:0.85rem; color:#94a3b8;">9선 눌림목 지지 구간 (현재가: ${curr:.2f})</span>
+                    <span style="font-size:1.1rem; font-weight:700; color:#f1f5f9;">약 {buy_rec_krw:,.0f} 원</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
             m1, m2 = st.columns(2)
             with m1:
-                st.metric(f"1차 익절가 (+{target_tp1_pct*100:.1f}%)", f"${tp1:.2f}", "분할 익절 권장")
-                st.metric(f"2차 익절가 (+{target_tp2_pct*100:.1f}%)", f"${tp2:.2f}", "추세 홀딩")
+                st.metric(f"1차 익절가 (+{target_tp1_pct*100:.1f}%)", f"${tp1:.2f}", f"약 {tp1*usd_krw:,.0f}원")
+                st.metric(f"2차 익절가 (+{target_tp2_pct*100:.1f}%)", f"${tp2:.2f}", f"약 {tp2*usd_krw:,.0f}원")
             with m2:
                 st.metric("칼손절가 (SL)", f"${sl:.2f}", f"{sl_pct:.2f}% (직전 저점)")
                 st.metric("기대 손익비", f"1 : {rr:.2f}", "검증된 기대치")
