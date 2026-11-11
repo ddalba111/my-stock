@@ -172,12 +172,19 @@ def save_portfolio(data):
     except Exception as e:
         st.error(f"영구 저장 중 오류: {e}")
 
+def set_active_ticker(sym):
+    st.session_state["main_ticker_input"] = sym
+    st.session_state.current_ticker = sym
+
 # 세션 상태 초기화 (영구 파일에서 로드)
 if "my_portfolio" not in st.session_state:
     st.session_state.my_portfolio = load_portfolio()
 
 if "current_ticker" not in st.session_state:
     st.session_state.current_ticker = "SOXL"
+
+if "main_ticker_input" not in st.session_state:
+    st.session_state.main_ticker_input = "SOXL"
 
 # 1. 메인 타이틀 & 새로고침 버튼
 col_title, col_ref = st.columns([3, 2])
@@ -329,24 +336,25 @@ with tab_analysis:
     st.write("💼 **내 보유 종목 빠른 선택**")
     active_stocks = [s for s, inf in st.session_state.my_portfolio.items() if inf.get("shares", 0) > 0]
 
-    selected_quick = None
     if active_stocks:
         cols = st.columns(min(len(active_stocks), 4))
         for idx, s_ticker in enumerate(active_stocks):
             col = cols[idx % len(cols)]
             with col:
                 sh_count = st.session_state.my_portfolio[s_ticker].get("shares", 0)
-                if st.button(f"🔥 {s_ticker} ({sh_count}주)", key=f"btn_my_{s_ticker}", use_container_width=True):
-                    selected_quick = s_ticker
+                st.button(
+                    f"🔥 {s_ticker} ({sh_count}주)",
+                    key=f"btn_my_{s_ticker}",
+                    on_click=set_active_ticker,
+                    args=(s_ticker,),
+                    use_container_width=True
+                )
     else:
         st.info("💡 등록된 보유 종목이 없습니다. '💼 내 보유 주식만 보기' 탭에서 종목을 등록하시면 여기에 빠른 분석 버튼이 생성됩니다!")
 
-    if selected_quick:
-        st.session_state.current_ticker = selected_quick
-
     col_input, col_mode = st.columns([3, 2])
     with col_input:
-        ticker = st.text_input("미국 주식 티커 입력", value=st.session_state.current_ticker, key="main_ticker_input").strip().upper()
+        ticker = st.text_input("미국 주식 티커 입력", key="main_ticker_input").strip().upper()
     with col_mode:
         mode = st.selectbox(
             "투자 관점 (모드)",
