@@ -1,1 +1,18 @@
-{}
+{
+  "SOXL": {
+    "shares": 20,
+    "avg_price": 66.1
+  },
+  "TQQQ": {
+    "shares": 15,
+    "avg_price": 60.03
+  },
+  "TSLA": {
+    "shares": 1,
+    "avg_price": 393.02
+  },
+  "NVDA": {
+    "shares": 2,
+    "avg_price": 174.93
+  }
+}
