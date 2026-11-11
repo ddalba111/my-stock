@@ -154,7 +154,40 @@ def get_chart_data(symbol, inter, rng):
 
 PORTFOLIO_FILE = "portfolio.json"
 
+def parse_portfolio_from_params():
+    try:
+        if hasattr(st, "query_params") and "p" in st.query_params:
+            p_val = st.query_params["p"]
+            d = {}
+            for item in p_val.split("_"):
+                parts = item.split(":")
+                if len(parts) == 3:
+                    sym, sh, avg = parts[0].upper(), int(parts[1]), float(parts[2])
+                    if sh > 0:
+                        d[sym] = {"shares": sh, "avg_price": avg}
+            if d:
+                return d
+    except Exception:
+        pass
+    return None
+
+def sync_portfolio_to_params(data):
+    try:
+        items = []
+        for s, inf in data.items():
+            sh = inf.get("shares", 0)
+            avg = inf.get("avg_price", 0.0)
+            if sh > 0:
+                items.append(f"{s}:{sh}:{avg}")
+        if items and hasattr(st, "query_params"):
+            st.query_params["p"] = "_".join(items)
+    except Exception:
+        pass
+
 def load_portfolio():
+    param_data = parse_portfolio_from_params()
+    if param_data:
+        return param_data
     if os.path.exists(PORTFOLIO_FILE):
         try:
             with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
@@ -169,8 +202,9 @@ def save_portfolio(data):
     try:
         with open(PORTFOLIO_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        st.error(f"영구 저장 중 오류: {e}")
+    except Exception:
+        pass
+    sync_portfolio_to_params(data)
 
 def set_active_ticker(sym):
     st.session_state["main_ticker_input"] = sym
