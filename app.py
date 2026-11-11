@@ -160,8 +160,18 @@ if "my_portfolio" not in st.session_state:
 if "current_ticker" not in st.session_state:
     st.session_state.current_ticker = "SOXL"
 
-# 1. 메인 타이틀
-st.title("📈 퀀트 분석기 & 내 보유 잔고")
+# 1. 메인 타이틀 & 새로고침 버튼
+col_title, col_ref = st.columns([3, 2])
+with col_title:
+    st.title("📈 퀀트 분석기")
+with col_ref:
+    st.write("")
+    if st.button("🔄 실시간 새로고침", type="primary", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
+now_kr_str = datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%H:%M:%S")
+st.caption(f"⚡ 실시간 호가 연동 (최근 갱신: 한국 시각 {now_kr_str})")
 
 # ==============================================================================
 # 🔥 [상시 고정] 내 실시간 보유 주식 요약 바 (어떤 화면에서도 항상 보임)
@@ -266,8 +276,6 @@ with tab_portfolio:
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            toss_link = f"https://tossinvest.com/stocks/{s_sym}"
-            st.link_button(f"📲 토스증권에서 {s_sym} 매도/주문하러 가기", toss_link)
     else:
         st.write("아직 등록된 보유 종목이 없습니다.")
 
@@ -477,9 +485,6 @@ with tab_analysis:
             </div>
             """
             components.html(tv_html, height=430)
-
-            toss_url = f"https://tossinvest.com/stocks/{ticker}"
-            st.link_button(f"📲 토스증권에서 {ticker} 1초 주문하러 가기", toss_url, type="primary")
 
             # 장기 투자 관점 정밀 진단 카드 (실제 1년치 일봉 데이터 기반)
             st.markdown("### 🏛️ 장기 투자 관점 정밀 진단")
