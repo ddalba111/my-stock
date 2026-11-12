@@ -514,15 +514,118 @@ for item in portfolio_items:
 tab_portfolio, tab_analysis = st.tabs(["💼 내 보유 주식만 보기", "📈 종목별 퀀트 타점 분석"])
 
 # ------------------------------------------------------------------------------
-# TAB 1: 내 보유 주식만 따로 보는 전용 화면
+# TAB 1: 내 보유 주식만 따로 보는 전용 화면 (토스증권 스타일 슈퍼 미니멀)
 # ------------------------------------------------------------------------------
 with tab_portfolio:
-    st.subheader("💼 내 실시간 보유 잔고 포트폴리오")
-    col_cap, col_reset = st.columns([3, 2])
-    with col_cap:
-        st.caption("내가 매수한 종목들의 실시간 평가 손익과 원화 수익금을 한눈에 확인합니다.")
-    with col_reset:
-        if st.button("🔄 토스 원본(20주/15주) 복원", use_container_width=True):
+    if portfolio_items:
+        # 1. 상단 총 자산 요약 (심플 1줄 카드)
+        tot_krw_invest = total_invest_usd * usd_krw
+        tot_krw_curr = total_curr_usd * usd_krw
+        tot_color = "#4ade80" if total_pnl_usd >= 0 else "#f87171"
+        
+        st.markdown(f"""
+        <div style="background-color: #1a1e29; border: 1px solid #2a3142; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.95rem; font-weight:bold; color:#cbd5e1;">💼 총 평가 자산</span>
+                <span style="font-size:1.3rem; font-weight:900; color:white;">${total_curr_usd:,.2f} <span style="font-size:0.95rem; font-weight:normal; color:#94a3b8;">({tot_krw_curr:,.0f}원)</span></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; border-top: 1px solid rgba(255,255,255,0.08); padding-top:8px;">
+                <span style="font-size:0.85rem; color:#94a3b8;">총 평가 손익</span>
+                <span style="font-size:1.15rem; font-weight:800; color:{tot_color};">{bar_sign}${total_pnl_usd:.2f} ({bar_sign}{total_pnl_pct:.2f}%, {bar_sign}{total_pnl_krw:,.0f}원)</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 2. 토스증권 스타일 종목별 미니멀 카드 (군더더기 1도 없이 딱 종목 정보만!)
+        for item in portfolio_items:
+            s_sym = item["symbol"]
+            s_shares = item["shares"]
+            s_avg = item["avg_price"]
+            s_live = item["live_price"]
+            s_pnl = item["pnl_usd"]
+            s_pct = item["pnl_pct"]
+            s_krw = s_pnl * usd_krw
+            s_is_profit = s_pnl >= 0
+            s_color = "#4ade80" if s_is_profit else "#f87171"
+            s_sign = "+" if s_is_profit else ""
+
+            st.markdown(f"""
+            <div style="background-color: #131722; border: 1px solid #232738; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:1.15rem; font-weight:800; color:white;">🔥 {s_sym} <span style="font-size:0.9rem; font-weight:normal; color:#94a3b8;">{s_shares}주</span></span>
+                    <span style="font-size:1.15rem; font-weight:800; color:{s_color};">{s_sign}${s_pnl:.2f} ({s_sign}{s_pct:.2f}%)</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                    <span style="font-size:0.85rem; color:#64748b;">평단 ${s_avg:.2f} → 현재가 <b>${s_live:.2f}</b></span>
+                    <span style="font-size:1.0rem; font-weight:700; color:{s_color};">{s_sign}{s_krw:,.0f} 원</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # 3. ⚙️ [수량 & 평단가 편집] 접이식 메뉴 딱 하나로 깔끔하게 정리!
+        st.markdown("---")
+        with st.expander("⚙️ 보유 수량 및 평단가 간편 편집", expanded=False):
+            st.caption("수정할 종목의 수량이나 평단가를 고친 뒤 아래 [저장하기]를 누르세요.")
+            
+            updated_p = {}
+            for s_sym, s_inf in st.session_state.my_portfolio.items():
+                c_l, c_s, c_p = st.columns([1.5, 2, 2])
+                with c_l:
+                    st.markdown(f"<div style='font-size:1.0rem; font-weight:bold; color:white; padding-top:6px;'>🔥 {s_sym}</div>", unsafe_allow_html=True)
+                with c_s:
+                    n_s = st.number_input(f"{s_sym} 수량", min_value=0, value=s_inf.get("shares", 0), step=1, key=f"ed_s_{s_sym}")
+                with c_p:
+                    n_p = st.number_input(f"{s_sym} 평단($)", min_value=0.01, value=float(s_inf.get("avg_price", 0.0)), step=0.1, format="%.2f", key=f"ed_p_{s_sym}")
+                
+                if n_s > 0:
+                    updated_p[s_sym] = {"shares": int(n_s), "avg_price": round(float(n_p), 2)}
+
+            col_sv, col_rst = st.columns([2, 1])
+            with col_sv:
+                if st.button("💾 수정사항 저장하기", type="primary", use_container_width=True, key="save_port_btn"):
+                    st.session_state.my_portfolio = updated_p
+                    save_portfolio(updated_p)
+                    st.success("저장되었습니다!")
+                    st.rerun()
+            with col_rst:
+                if st.button("🔄 토스 원본 복원", use_container_width=True, key="rst_btn"):
+                    default_data = {
+                        "SOXL": {"shares": 20, "avg_price": 66.10},
+                        "TQQQ": {"shares": 15, "avg_price": 60.03},
+                        "TSLA": {"shares": 1, "avg_price": 393.02},
+                        "NVDA": {"shares": 2, "avg_price": 174.93}
+                    }
+                    st.session_state.my_portfolio = default_data
+                    save_portfolio(default_data)
+                    st.rerun()
+
+            st.markdown("---")
+            st.markdown("##### ➕ 새 종목 추가")
+            q_c = st.columns(6)
+            for idx, pt in enumerate(["SOXL", "TQQQ", "TSLA", "NVDA", "NVDL", "CONL"]):
+                with q_c[idx]:
+                    if st.button(pt, key=f"add_p_{pt}", use_container_width=True):
+                        st.session_state["add_p_sym"] = pt
+            
+            init_new = st.session_state.get("add_p_sym", "")
+            c_n1, c_n2, c_n3, c_n4 = st.columns([1.5, 1.5, 1.5, 1.5])
+            with c_n1:
+                add_sym = st.text_input("티커", value=init_new, key="add_p_input").strip().upper()
+            with c_n2:
+                add_sh = st.number_input("수량", min_value=1, value=1, step=1)
+            with c_n3:
+                add_pr = st.number_input("평단가($)", min_value=0.01, value=50.0, step=0.1, format="%.2f")
+            with c_n4:
+                st.write("")
+                st.write("")
+                if st.button("추가", use_container_width=True):
+                    if add_sym:
+                        st.session_state.my_portfolio[add_sym] = {"shares": int(add_sh), "avg_price": round(float(add_pr), 2)}
+                        save_portfolio(st.session_state.my_portfolio)
+                        st.rerun()
+    else:
+        st.write("아직 등록된 보유 종목이 없습니다.")
+        if st.button("🔄 토스 계좌 원본 불러오기 (20주/15주)"):
             default_data = {
                 "SOXL": {"shares": 20, "avg_price": 66.10},
                 "TQQQ": {"shares": 15, "avg_price": 60.03},
@@ -533,175 +636,14 @@ with tab_portfolio:
             save_portfolio(default_data)
             st.rerun()
 
-    if portfolio_items:
-        col_t1, col_t2 = st.columns(2)
-        with col_t1:
-            st.metric("총 매수 원금", f"${total_invest_usd:,.2f}", f"{total_invest_usd * usd_krw:,.0f} 원")
-            st.metric("총 평가 손익 (USD)", f"{bar_sign}${total_pnl_usd:.2f}", f"{bar_sign}{total_pnl_pct:.2f}%")
-        with col_t2:
-            st.metric("현재 총 평가액", f"${total_curr_usd:,.2f}", f"{total_curr_usd * usd_krw:,.0f} 원")
-            st.metric("총 평가 손익 (KRW)", f"{bar_sign}{total_pnl_krw:,.0f} 원", f"적용 환율 {usd_krw:,.0f}원")
-
-        # ⚡ 1. 최상단 원터치 수량 조절 바 (키보드 타이핑 없이 터치로만 조절)
-        st.markdown("""
-        <div style="background-color: #1e293b; border: 1.5px solid #38bdf8; border-radius: 12px; padding: 10px 14px; margin-top: 10px; margin-bottom: 12px;">
-            <div style="font-size:0.95rem; font-weight:800; color:#38bdf8;">⚡ 보유 수량 1초 터치 조절 (키보드 불필요)</div>
-            <div style="font-size:0.8rem; color:#94a3b8; margin-top:2px;">버튼을 누르면 평단가는 안전하게 유지된 채 수량이 즉시 수정·저장됩니다.</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        for item in portfolio_items:
-            s_sym = item['symbol']
-            s_shares = item['shares']
-
-            c_sym, c_m5, c_m1, c_num, c_p1, c_p5 = st.columns([2.0, 1.1, 1.1, 2.0, 1.1, 1.1])
-            with c_sym:
-                st.markdown(f"<div style='font-size:1.0rem; font-weight:800; color:white; padding-top:6px;'>🔥 {s_sym}</div>", unsafe_allow_html=True)
-            with c_m5:
-                if st.button("−5", key=f"qbar_m5_{s_sym}", help=f"{s_sym} 5주 차감", use_container_width=True):
-                    new_sh = s_shares - 5
-                    if new_sh > 0:
-                        st.session_state.my_portfolio[s_sym]["shares"] = new_sh
-                    else:
-                        del st.session_state.my_portfolio[s_sym]
-                    save_portfolio(st.session_state.my_portfolio)
-                    st.rerun()
-            with c_m1:
-                if st.button("−1", key=f"qbar_m1_{s_sym}", help=f"{s_sym} 1주 차감", use_container_width=True):
-                    new_sh = s_shares - 1
-                    if new_sh > 0:
-                        st.session_state.my_portfolio[s_sym]["shares"] = new_sh
-                    else:
-                        del st.session_state.my_portfolio[s_sym]
-                    save_portfolio(st.session_state.my_portfolio)
-                    st.rerun()
-            with c_num:
-                st.markdown(f"<div style='text-align:center; font-size:1.05rem; font-weight:900; color:#38bdf8; background-color:#0f172a; border-radius:6px; padding:4px 0;'>{s_shares}주</div>", unsafe_allow_html=True)
-            with c_p1:
-                if st.button("+1", key=f"qbar_p1_{s_sym}", help=f"{s_sym} 1주 추가", use_container_width=True):
-                    st.session_state.my_portfolio[s_sym]["shares"] = s_shares + 1
-                    save_portfolio(st.session_state.my_portfolio)
-                    st.rerun()
-            with c_p5:
-                if st.button("+5", key=f"qbar_p5_{s_sym}", help=f"{s_sym} 5주 추가", use_container_width=True):
-                    st.session_state.my_portfolio[s_sym]["shares"] = s_shares + 5
-                    save_portfolio(st.session_state.my_portfolio)
-                    st.rerun()
-
-        st.markdown("---")
-        st.markdown("### 📋 종목별 상세 보유 내역")
-        for item in portfolio_items:
-            s_sym = item['symbol']
-            s_shares = item['shares']
-            s_avg = item['avg_price']
-            s_live = item['live_price']
-            s_pnl = item['pnl_usd']
-            s_pct = item['pnl_pct']
-            s_krw = s_pnl * usd_krw
-            s_is_profit = s_pnl >= 0
-            s_color = "#4ade80" if s_is_profit else "#f87171"
-            s_sign = "+" if s_is_profit else ""
-
-            st.markdown(f"""
-            <div style="background-color: #1a1e29; border: 1px solid #2a3142; border-radius: 12px; padding: 14px; margin-bottom: 6px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:1.15rem; font-weight:bold; color:white;">🔥 {s_sym} ({s_shares}주)</span>
-                    <span style="font-size:1.2rem; font-weight:800; color:{s_color};">{s_sign}${s_pnl:.2f} ({s_sign}{s_pct:.2f}%)</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                    <span style="font-size:0.9rem; color:#94a3b8;">평단 ${s_avg:.2f} → 현재가 <b>${s_live:.2f}</b></span>
-                    <span style="font-size:1.1rem; font-weight:800; color:{s_color};">{s_sign}{s_krw:,.0f} 원</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # ✏️ 카드 바로 아래 초간편 수량 & 평단가 직접 수정 바
-            col_inp_sh, col_inp_pr, col_set, col_del = st.columns([2.2, 2.2, 1.8, 1.0])
-            with col_inp_sh:
-                direct_sh = st.number_input(
-                    f"{s_sym} 수량 (주)",
-                    min_value=0,
-                    value=s_shares,
-                    step=1,
-                    key=f"card_sh_{s_sym}"
-                )
-            with col_inp_pr:
-                direct_pr = st.number_input(
-                    f"{s_sym} 평단가 ($)",
-                    min_value=0.01,
-                    value=float(s_avg),
-                    step=0.1,
-                    format="%.2f",
-                    key=f"card_pr_{s_sym}"
-                )
-            with col_set:
-                st.write("")
-                st.write("")
-                if st.button("💾 저장", key=f"card_btn_{s_sym}", use_container_width=True, help="수량과 평단가 즉시 저장", type="secondary"):
-                    if direct_sh > 0:
-                        st.session_state.my_portfolio[s_sym] = {"shares": int(direct_sh), "avg_price": round(float(direct_pr), 2)}
-                    else:
-                        del st.session_state.my_portfolio[s_sym]
-                    save_portfolio(st.session_state.my_portfolio)
-                    st.rerun()
-            with col_del:
-                st.write("")
-                st.write("")
-                if st.button("🗑️", key=f"card_del_{s_sym}", help=f"{s_sym} 종목 삭제", use_container_width=True):
-                    del st.session_state.my_portfolio[s_sym]
-                    save_portfolio(st.session_state.my_portfolio)
-                    st.rerun()
-
-            with st.expander(f"📝 {s_sym} 익절/매도 기록하기 (수량 & 단가 직접 설정)", expanded=False):
-                col_j1, col_j2 = st.columns(2)
-                with col_j1:
-                    sell_shares = st.number_input(f"매도할 수량 (최대 {s_shares}주)", min_value=1, max_value=s_shares, value=s_shares, step=1, key=f"s_sh_{s_sym}")
-                    auto_deduct = st.checkbox("내 보유 수량에서 차감하기", value=True, key=f"deduct_{s_sym}")
-                with col_j2:
-                    sell_price = st.number_input("실제 매도 단가 ($)", min_value=0.01, value=float(round(s_live, 2)), step=0.1, format="%.2f", key=f"s_pr_{s_sym}")
-
-                calc_usd = (sell_price - s_avg) * sell_shares
-                calc_krw = calc_usd * usd_krw
-                calc_pct = ((sell_price - s_avg) / s_avg) * 100 if s_avg > 0 else 0
-                sign_calc = "+" if calc_usd >= 0 else ""
-
-                st.caption(f"확정 실현 손익: **{sign_calc}${calc_usd:.2f} ({sign_calc}{calc_krw:,.0f}원, {sign_calc}{calc_pct:.2f}%)**")
-
-                if st.button(f"💾 {s_sym} {sell_shares}주 @ ${sell_price:.2f} 장부에 저장", key=f"save_j_{s_sym}", type="primary", use_container_width=True):
-                    j_list = load_journal()
-                    j_list.insert(0, {
-                        "date": datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M"),
-                        "symbol": s_sym,
-                        "shares": int(sell_shares),
-                        "buy_price": round(s_avg, 2),
-                        "sell_price": round(sell_price, 2),
-                        "profit_krw": int(calc_krw),
-                        "profit_usd": round(calc_usd, 2),
-                        "pct": round(calc_pct, 2),
-                        "note": f"평단 ${s_avg:.2f} → 매도 ${sell_price:.2f}"
-                    })
-                    save_journal(j_list)
-
-                    if auto_deduct:
-                        rem = s_shares - sell_shares
-                        if rem > 0:
-                            st.session_state.my_portfolio[s_sym]["shares"] = rem
-                        else:
-                            del st.session_state.my_portfolio[s_sym]
-                        save_portfolio(st.session_state.my_portfolio)
-
-                    st.success(f"{s_sym} {sell_shares}주 익절 기록 완료!")
-                    st.rerun()
-
-        # ----------------------------------------------------------------------
-        # 🎮 시드 2배 복리 퀘스트 로드맵 (500만 ➔ 1,000만 원)
-        # ----------------------------------------------------------------------
-        st.markdown("---")
-        st.subheader("🎮 시드 2배 복리 퀘스트 (500만 ➔ 1,000만 원)")
+    # --------------------------------------------------------------------------
+    # 하단: 시드 퀘스트 & 장부 (접어두기)
+    # --------------------------------------------------------------------------
+    st.markdown("---")
+    with st.expander("🎮 1,000만 원 복리 퀘스트 & 매매 장부", expanded=False):
         journal_entries = load_journal()
         tot_realized_krw = sum(x.get("profit_krw", 0) for x in journal_entries)
         win_trades = len([x for x in journal_entries if x.get("profit_krw", 0) > 0])
-
         base_seed = 5000000
         target_seed = 10000000
         current_asset = base_seed + tot_realized_krw
@@ -710,118 +652,38 @@ with tab_portfolio:
         trades_left = max(0, 20 - win_trades)
         remaining_krw = max(0, target_seed - current_asset)
         level_num = min(20, win_trades)
+        sign_real = "+" if tot_realized_krw >= 0 else ""
 
         st.markdown(f"""
-        <div style="background-color: #1e1b4b; border: 1.5px solid #6366f1; border-radius: 12px; padding: 16px; margin-bottom: 14px;">
+        <div style="background-color: #1e1b4b; border: 1px solid #6366f1; border-radius: 10px; padding: 12px; margin-bottom: 10px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:1.15rem; font-weight:bold; color:#c7d2fe;">🏆 LEVEL {level_num} : 1,000만 원 로드맵</span>
-                <span style="font-size:1.25rem; font-weight:800; color:#a5b4fc;">{progress_pct:.1f}% 달성</span>
+                <span style="font-weight:bold; color:#c7d2fe;">🏆 LEVEL {level_num} ({progress_pct:.1f}%)</span>
+                <span style="font-size:0.85rem; color:#a5b4fc;">남은 익절: {trades_left}회</span>
             </div>
-            <div style="margin: 10px 0 6px 0;">
-                <div style="background-color: #312e81; border-radius: 8px; height: 14px; overflow: hidden;">
+            <div style="margin: 6px 0;">
+                <div style="background-color: #312e81; border-radius: 6px; height: 10px; overflow: hidden;">
                     <div style="background: linear-gradient(90deg, #6366f1, #a855f7); width: {max(5, int(progress_pct))}%; height: 100%;"></div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#e0e7ff; margin-top:6px;">
-                <span>현재 자산: <b>{current_asset:,.0f} 원</b> ({'+' if tot_realized_krw>=0 else ''}{tot_realized_krw:,.0f}원)</span>
-                <span>목표: <b>10,000,000 원</b></span>
-            </div>
-            <div style="margin-top:8px; font-size:0.85rem; color:#a5b4fc; background-color:#2e1065; padding:8px 12px; border-radius:8px;">
-                🎯 <b>퀘스트 현황</b>: 1회당 +3.5% 익절 기준 앞으로 <b>{trades_left}회 익절 성공 시</b> 1,000만 원 2배 달성 완료! (남은 목표액: {remaining_krw:,.0f}원)
-            </div>
+            <div style="font-size:0.8rem; color:#e0e7ff;">현재 누적 수익: <b>{sign_real}{tot_realized_krw:,.0f}원</b></div>
         </div>
         """, unsafe_allow_html=True)
 
-        # 2. 누적 실현 손익 장부 (접어두기)
-        st.markdown("---")
-        journal_entries = load_journal()
-        tot_realized_krw = sum(x.get("profit_krw", 0) for x in journal_entries)
-        tot_realized_usd = sum(x.get("profit_usd", 0.0) for x in journal_entries)
-        j_sign = "+" if tot_realized_krw >= 0 else ""
-
-        with st.expander(f"💰 이번 달 누적 실현 손익 장부 ({j_sign}{tot_realized_krw:,.0f}원 / {len(journal_entries)}회 매매)", expanded=False):
-            if journal_entries:
-                j_color = "#4ade80" if tot_realized_krw >= 0 else "#f87171"
+        if journal_entries:
+            for idx, j in enumerate(journal_entries):
+                p_c = "#4ade80" if j.get("profit_krw", 0) >= 0 else "#f87171"
+                p_s = "+" if j.get("profit_krw", 0) >= 0 else ""
                 st.markdown(f"""
-                <div style="background-color: #1a1e29; border: 1px solid #3b82f6; border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:0.95rem; font-weight:bold; color:#93c5fd;">총 누적 확정 수익금</span>
-                        <span style="font-size:1.25rem; font-weight:800; color:{j_color};">{j_sign}{tot_realized_krw:,.0f} 원</span>
-                    </div>
-                    <div style="text-align:right; font-size:0.85rem; color:#cbd5e1; margin-top:2px;">
-                        {j_sign}${tot_realized_usd:.2f} (총 {len(journal_entries)}회 매매 확정)
-                    </div>
+                <div style="background-color: #0f172a; border-radius: 6px; padding: 6px 10px; margin-bottom: 4px; display:flex; justify-content:space-between; font-size:0.85rem;">
+                    <span style="color:white;">{j.get("symbol")} ({j.get("shares")}주 @ ${j.get("sell_price"):.2f})</span>
+                    <span style="font-weight:bold; color:{p_c};">{p_s}{j.get("profit_krw"):,.0f}원</span>
                 </div>
                 """, unsafe_allow_html=True)
-
-                for idx, j in enumerate(journal_entries):
-                    p_c = "#4ade80" if j.get("profit_krw", 0) >= 0 else "#f87171"
-                    p_s = "+" if j.get("profit_krw", 0) >= 0 else ""
-                    col_rec, col_del = st.columns([5, 1])
-                    with col_rec:
-                        st.markdown(f"""
-                        <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;">
-                            <div style="display:flex; justify-content:space-between;">
-                                <span style="font-weight:bold; color:white;">{j.get('symbol')} ({j.get('shares')}주 @ ${j.get('sell_price'):.2f})</span>
-                                <span style="font-weight:bold; color:{p_c};">{p_s}{j.get('profit_krw'):,.0f}원 ({p_s}{j.get('pct')}%)</span>
-                            </div>
-                            <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
-                                {j.get('date')}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    with col_del:
-                        st.write("")
-                        if st.button("🗑️", key=f"del_rec_{idx}", help="이 기록 삭제"):
-                            journal_entries.pop(idx)
-                            save_journal(journal_entries)
-                            st.rerun()
-
-                if st.button("⚠️ 장부 전체 기록 삭제", type="secondary"):
-                    save_journal([])
-                    st.success("장부의 모든 기록이 삭제되었습니다.")
-                    st.rerun()
-            else:
-                st.write("아직 등록된 매매 기록이 없습니다.")
-    else:
-        st.write("아직 등록된 보유 종목이 없습니다.")
-
-    st.markdown("---")
-    st.markdown("### ⚙️ 새 종목 추가 & 평단가 수정")
-    with st.expander("➕ 새 종목 등록 / 평단가 수정하기", expanded=False):
-        st.caption("대표 인기 종목을 누르면 티커가 자동으로 채워집니다.")
-        p_cols = st.columns(6)
-        presets = ["SOXL", "TQQQ", "TSLA", "NVDA", "NVDL", "CONL"]
-        for p_idx, pt in enumerate(presets):
-            with p_cols[p_idx]:
-                if st.button(pt, key=f"quick_t_{pt}", use_container_width=True):
-                    st.session_state["sel_add_sym"] = pt
-
-        default_sel = st.session_state.get("sel_add_sym", "")
-        curr_port_item = st.session_state.my_portfolio.get(default_sel, {})
-        def_sh = curr_port_item.get("shares", 0)
-        def_avg = curr_port_item.get("avg_price", 0.0)
-
-        c_e1, c_e2, c_e3 = st.columns(3)
-        with c_e1:
-            edit_sym = st.text_input("티커 (예: SOXL, TSLA)", value=default_sel, key="input_edit_sym").strip().upper()
-        with c_e2:
-            edit_shares = st.number_input("보유 수량 (주, 0이면 삭제)", min_value=0, value=def_sh, step=1)
-        with c_e3:
-            edit_avg = st.number_input("매수 평단가 ($)", min_value=0.0, value=float(def_avg), step=0.1, format="%.2f")
-
-        if st.button("💾 저장 / 수정하기", type="primary", use_container_width=True):
-            if edit_sym:
-                if edit_shares > 0:
-                    st.session_state.my_portfolio[edit_sym] = {"shares": edit_shares, "avg_price": edit_avg}
-                    save_portfolio(st.session_state.my_portfolio)
-                    st.success(f"{edit_sym} {edit_shares}주 (${edit_avg:.2f}) 영구 저장 완료!")
-                else:
-                    if edit_sym in st.session_state.my_portfolio:
-                        del st.session_state.my_portfolio[edit_sym]
-                        save_portfolio(st.session_state.my_portfolio)
-                        st.warning(f"{edit_sym} 삭제 완료!")
+            if st.button("⚠️ 장부 기록 전체 삭제", type="secondary"):
+                save_journal([])
                 st.rerun()
+        else:
+            st.caption("아직 기록된 매매 일지가 없습니다.")
 
 # ------------------------------------------------------------------------------
 # TAB 2: 종목별 퀀트 타점 분석기
