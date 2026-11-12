@@ -305,7 +305,7 @@ def load_portfolio():
         try:
             with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
                 d = json.load(f)
-                if isinstance(d, dict) and len(d) > 0:
+                if isinstance(d, dict):
                     return d
         except Exception:
             pass
@@ -580,9 +580,9 @@ with tab_portfolio:
                 if n_s > 0:
                     updated_p[s_sym] = {"shares": int(n_s), "avg_price": round(float(n_p), 2)}
 
-            col_sv, col_rst = st.columns([2, 1])
+            col_sv, col_rst, col_clr = st.columns([1.5, 1.2, 1.2])
             with col_sv:
-                if st.button("💾 수정사항 저장하기", type="primary", use_container_width=True, key="save_port_btn"):
+                if st.button("💾 저장하기", type="primary", use_container_width=True, key="save_port_btn"):
                     st.session_state.my_portfolio = updated_p
                     save_portfolio(updated_p)
                     st.success("저장되었습니다!")
@@ -597,6 +597,11 @@ with tab_portfolio:
                     }
                     st.session_state.my_portfolio = default_data
                     save_portfolio(default_data)
+                    st.rerun()
+            with col_clr:
+                if st.button("🗑️ 전체 비우기", use_container_width=True, key="clr_btn"):
+                    st.session_state.my_portfolio = {}
+                    save_portfolio({})
                     st.rerun()
 
             st.markdown("---")
