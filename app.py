@@ -615,26 +615,38 @@ with tab_portfolio:
             </div>
             """, unsafe_allow_html=True)
 
-            # ✏️ 카드 바로 아래 초간편 수량 변경 & 삭제 (평단가 유지)
-            col_inp, col_set, col_del = st.columns([3, 1.8, 1])
-            with col_inp:
+            # ✏️ 카드 바로 아래 초간편 수량 & 평단가 직접 수정 바
+            col_inp_sh, col_inp_pr, col_set, col_del = st.columns([2.2, 2.2, 1.8, 1.0])
+            with col_inp_sh:
                 direct_sh = st.number_input(
-                    f"{s_sym} 수량 직접 입력",
+                    f"{s_sym} 수량 (주)",
                     min_value=0,
                     value=s_shares,
                     step=1,
-                    key=f"card_sh_{s_sym}",
-                    label_visibility="collapsed"
+                    key=f"card_sh_{s_sym}"
+                )
+            with col_inp_pr:
+                direct_pr = st.number_input(
+                    f"{s_sym} 평단가 ($)",
+                    min_value=0.01,
+                    value=float(s_avg),
+                    step=0.1,
+                    format="%.2f",
+                    key=f"card_pr_{s_sym}"
                 )
             with col_set:
-                if st.button("💾 변경", key=f"card_btn_{s_sym}", use_container_width=True, help="입력한 수량으로 즉시 변경"):
+                st.write("")
+                st.write("")
+                if st.button("💾 저장", key=f"card_btn_{s_sym}", use_container_width=True, help="수량과 평단가 즉시 저장", type="secondary"):
                     if direct_sh > 0:
-                        st.session_state.my_portfolio[s_sym]["shares"] = int(direct_sh)
+                        st.session_state.my_portfolio[s_sym] = {"shares": int(direct_sh), "avg_price": round(float(direct_pr), 2)}
                     else:
                         del st.session_state.my_portfolio[s_sym]
                     save_portfolio(st.session_state.my_portfolio)
                     st.rerun()
             with col_del:
+                st.write("")
+                st.write("")
                 if st.button("🗑️", key=f"card_del_{s_sym}", help=f"{s_sym} 종목 삭제", use_container_width=True):
                     del st.session_state.my_portfolio[s_sym]
                     save_portfolio(st.session_state.my_portfolio)
