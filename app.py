@@ -434,7 +434,7 @@ if portfolio_items:
         pct = item["pnl_pct"]
         lp = item["live_price"]
 
-        if pct >= 3.5:
+        if pct >= 1.5:
             light = "🟢"
             status_text = "익절 권장"
             status_color = "#4ade80"
@@ -486,22 +486,22 @@ for item in portfolio_items:
     i_pct = item['pnl_pct']
     i_pnl_krw = item['pnl_usd'] * usd_krw
     i_live = item['live_price']
-    if i_pct >= 7.0:
+    if i_pct >= 3.5:
         st.markdown(f"""
         <div style="background-color: #064e3b; border: 1.5px solid #10b981; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
-            <span style="font-size:0.9rem; font-weight:800; color:#6ee7b7;">🎉 [익절 도달] {i_sym} 2차 목표(+7%) 돌파! (${i_live:.2f}, +{i_pnl_krw:,.0f}원) — 전량/분할 익절 권장!</span>
+            <span style="font-size:0.9rem; font-weight:800; color:#6ee7b7;">🎉 [익절 도달] {i_sym} 2차 목표(+3.5%) 돌파! (${i_live:.2f}, +{i_pnl_krw:,.0f}원) — 전량/분할 익절 권장!</span>
         </div>
         """, unsafe_allow_html=True)
-    elif i_pct >= 3.5:
+    elif i_pct >= 1.5:
         st.markdown(f"""
         <div style="background-color: #1e3a8a; border: 1.5px solid #3b82f6; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
-            <span style="font-size:0.9rem; font-weight:800; color:#93c5fd;">🎯 [익절 도달] {i_sym} 1차 목표(+3.5%) 도달! (${i_live:.2f}, +{i_pnl_krw:,.0f}원) — 50% 분할 매도 권장!</span>
+            <span style="font-size:0.9rem; font-weight:800; color:#93c5fd;">🎯 [익절 도달] {i_sym} 1차 목표(+1.5%) 도달! (${i_live:.2f}, +{i_pnl_krw:,.0f}원) — 50% 분할 매도 권장!</span>
         </div>
         """, unsafe_allow_html=True)
-    elif i_pct <= -1.8:
+    elif i_pct <= -1.0:
         st.markdown(f"""
         <div style="background-color: #7f1d1d; border: 1.5px solid #ef4444; border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;">
-            <span style="font-size:0.9rem; font-weight:800; color:#fca5a5;">⚠️ [손절 경고] {i_sym} 손절선(-1.8%) 이탈! (${i_live:.2f}) — 칼손절 권장!</span>
+            <span style="font-size:0.9rem; font-weight:800; color:#fca5a5;">⚠️ [손절 경고] {i_sym} 손절선(-1.0%) 이탈! (${i_live:.2f}) — 칼손절 권장!</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -731,10 +731,10 @@ with tab_analysis:
         interval_param = "15m"
         range_param = "5d"
         tv_interval = "15"
-        target_tp1_pct = 0.035  # +3.5%
-        target_tp2_pct = 0.070  # +7.0%
-        target_sl_pct = 0.018   # -1.8%
-        mode_name = "초단타 / 15분봉 모드 (1~2일 컷)"
+        target_tp1_pct = 0.015  # +1.5%
+        target_tp2_pct = 0.035  # +3.5%
+        target_sl_pct = 0.010   # -1.0%
+        mode_name = "초단타 / 15분봉 모드 (당일 스캘핑)"
     elif "일봉" in mode:
         interval_param = "1d"
         range_param = "1y"
