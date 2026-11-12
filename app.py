@@ -542,6 +542,53 @@ with tab_portfolio:
             st.metric("현재 총 평가액", f"${total_curr_usd:,.2f}", f"{total_curr_usd * usd_krw:,.0f} 원")
             st.metric("총 평가 손익 (KRW)", f"{bar_sign}{total_pnl_krw:,.0f} 원", f"적용 환율 {usd_krw:,.0f}원")
 
+        # ⚡ 1. 최상단 원터치 수량 조절 바 (키보드 타이핑 없이 터치로만 조절)
+        st.markdown("""
+        <div style="background-color: #1e293b; border: 1.5px solid #38bdf8; border-radius: 12px; padding: 10px 14px; margin-top: 10px; margin-bottom: 12px;">
+            <div style="font-size:0.95rem; font-weight:800; color:#38bdf8;">⚡ 보유 수량 1초 터치 조절 (키보드 불필요)</div>
+            <div style="font-size:0.8rem; color:#94a3b8; margin-top:2px;">버튼을 누르면 평단가는 안전하게 유지된 채 수량이 즉시 수정·저장됩니다.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        for item in portfolio_items:
+            s_sym = item['symbol']
+            s_shares = item['shares']
+
+            c_sym, c_m5, c_m1, c_num, c_p1, c_p5 = st.columns([2.0, 1.1, 1.1, 2.0, 1.1, 1.1])
+            with c_sym:
+                st.markdown(f"<div style='font-size:1.0rem; font-weight:800; color:white; padding-top:6px;'>🔥 {s_sym}</div>", unsafe_allow_html=True)
+            with c_m5:
+                if st.button("−5", key=f"qbar_m5_{s_sym}", help=f"{s_sym} 5주 차감", use_container_width=True):
+                    new_sh = s_shares - 5
+                    if new_sh > 0:
+                        st.session_state.my_portfolio[s_sym]["shares"] = new_sh
+                    else:
+                        del st.session_state.my_portfolio[s_sym]
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.rerun()
+            with c_m1:
+                if st.button("−1", key=f"qbar_m1_{s_sym}", help=f"{s_sym} 1주 차감", use_container_width=True):
+                    new_sh = s_shares - 1
+                    if new_sh > 0:
+                        st.session_state.my_portfolio[s_sym]["shares"] = new_sh
+                    else:
+                        del st.session_state.my_portfolio[s_sym]
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.rerun()
+            with c_num:
+                st.markdown(f"<div style='text-align:center; font-size:1.05rem; font-weight:900; color:#38bdf8; background-color:#0f172a; border-radius:6px; padding:4px 0;'>{s_shares}주</div>", unsafe_allow_html=True)
+            with c_p1:
+                if st.button("+1", key=f"qbar_p1_{s_sym}", help=f"{s_sym} 1주 추가", use_container_width=True):
+                    st.session_state.my_portfolio[s_sym]["shares"] = s_shares + 1
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.rerun()
+            with c_p5:
+                if st.button("+5", key=f"qbar_p5_{s_sym}", help=f"{s_sym} 5주 추가", use_container_width=True):
+                    st.session_state.my_portfolio[s_sym]["shares"] = s_shares + 5
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.rerun()
+
+        st.markdown("---")
         st.markdown("### 📋 종목별 상세 보유 내역")
         for item in portfolio_items:
             s_sym = item['symbol']
@@ -556,7 +603,7 @@ with tab_portfolio:
             s_sign = "+" if s_is_profit else ""
 
             st.markdown(f"""
-            <div style="background-color: #1a1e29; border: 1px solid #2a3142; border-radius: 12px; padding: 14px; margin-bottom: 10px;">
+            <div style="background-color: #1a1e29; border: 1px solid #2a3142; border-radius: 12px; padding: 14px; margin-bottom: 6px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:1.15rem; font-weight:bold; color:white;">🔥 {s_sym} ({s_shares}주)</span>
                     <span style="font-size:1.2rem; font-weight:800; color:{s_color};">{s_sign}${s_pnl:.2f} ({s_sign}{s_pct:.2f}%)</span>
@@ -567,6 +614,31 @@ with tab_portfolio:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+            # ✏️ 카드 바로 아래 초간편 수량 변경 & 삭제 (평단가 유지)
+            col_inp, col_set, col_del = st.columns([3, 1.8, 1])
+            with col_inp:
+                direct_sh = st.number_input(
+                    f"{s_sym} 수량 직접 입력",
+                    min_value=0,
+                    value=s_shares,
+                    step=1,
+                    key=f"card_sh_{s_sym}",
+                    label_visibility="collapsed"
+                )
+            with col_set:
+                if st.button("💾 변경", key=f"card_btn_{s_sym}", use_container_width=True, help="입력한 수량으로 즉시 변경"):
+                    if direct_sh > 0:
+                        st.session_state.my_portfolio[s_sym]["shares"] = int(direct_sh)
+                    else:
+                        del st.session_state.my_portfolio[s_sym]
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.rerun()
+            with col_del:
+                if st.button("🗑️", key=f"card_del_{s_sym}", help=f"{s_sym} 종목 삭제", use_container_width=True):
+                    del st.session_state.my_portfolio[s_sym]
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.rerun()
 
             with st.expander(f"📝 {s_sym} 익절/매도 기록하기 (수량 & 단가 직접 설정)", expanded=False):
                 col_j1, col_j2 = st.columns(2)
@@ -703,17 +775,30 @@ with tab_portfolio:
         st.write("아직 등록된 보유 종목이 없습니다.")
 
     st.markdown("---")
-    st.markdown("### ⚙️ 보유 종목 추가 / 수정 / 삭제")
-    with st.expander("➕ 새 종목 등록 또는 수량 변경", expanded=False):
+    st.markdown("### ⚙️ 새 종목 추가 & 평단가 수정")
+    with st.expander("➕ 새 종목 등록 / 평단가 수정하기", expanded=False):
+        st.caption("대표 인기 종목을 누르면 티커가 자동으로 채워집니다.")
+        p_cols = st.columns(6)
+        presets = ["SOXL", "TQQQ", "TSLA", "NVDA", "NVDL", "CONL"]
+        for p_idx, pt in enumerate(presets):
+            with p_cols[p_idx]:
+                if st.button(pt, key=f"quick_t_{pt}", use_container_width=True):
+                    st.session_state["sel_add_sym"] = pt
+
+        default_sel = st.session_state.get("sel_add_sym", "")
+        curr_port_item = st.session_state.my_portfolio.get(default_sel, {})
+        def_sh = curr_port_item.get("shares", 0)
+        def_avg = curr_port_item.get("avg_price", 0.0)
+
         c_e1, c_e2, c_e3 = st.columns(3)
         with c_e1:
-            edit_sym = st.text_input("티커 (예: SOXL, TSLA)", value="").strip().upper()
+            edit_sym = st.text_input("티커 (예: SOXL, TSLA)", value=default_sel, key="input_edit_sym").strip().upper()
         with c_e2:
-            edit_shares = st.number_input("보유 수량 (주, 0이면 삭제)", min_value=0, value=0, step=1)
+            edit_shares = st.number_input("보유 수량 (주, 0이면 삭제)", min_value=0, value=def_sh, step=1)
         with c_e3:
-            edit_avg = st.number_input("매수 평단가 ($)", min_value=0.0, value=0.0, step=0.1, format="%.2f")
+            edit_avg = st.number_input("매수 평단가 ($)", min_value=0.0, value=float(def_avg), step=0.1, format="%.2f")
 
-        if st.button("💾 저장 / 수정하기"):
+        if st.button("💾 저장 / 수정하기", type="primary", use_container_width=True):
             if edit_sym:
                 if edit_shares > 0:
                     st.session_state.my_portfolio[edit_sym] = {"shares": edit_shares, "avg_price": edit_avg}
