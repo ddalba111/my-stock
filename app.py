@@ -306,18 +306,14 @@ def load_portfolio():
             with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
                 d = json.load(f)
                 if isinstance(d, dict):
+                    if len(d) == 0:
+                        if hasattr(st, "query_params") and "p" in st.query_params:
+                            del st.query_params["p"]
+                        return {}
                     return d
         except Exception:
             pass
-    param_data = parse_portfolio_from_params()
-    if param_data is not None:
-        return param_data
-    return {
-        "SOXL": {"shares": 20, "avg_price": 66.10},
-        "TQQQ": {"shares": 15, "avg_price": 60.03},
-        "TSLA": {"shares": 1, "avg_price": 393.02},
-        "NVDA": {"shares": 2, "avg_price": 174.93}
-    }
+    return {}
 
 def save_portfolio(data):
     try:
@@ -349,6 +345,7 @@ with col_ref:
     st.write("")
     if st.button("🔄 새로고침", type="primary", use_container_width=True):
         st.cache_data.clear()
+        st.session_state.my_portfolio = load_portfolio()
         st.rerun()
 
 now_kr_str = datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%H:%M:%S")
@@ -561,12 +558,19 @@ with tab_portfolio:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="background-color: #1a1e29; border: 1.5px dashed #334155; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 12px;">
+            <span style="font-size:1.1rem; font-weight:bold; color:#cbd5e1;">현재 등록된 보유 종목이 없습니다 (0종목).</span><br>
+            <span style="font-size:0.85rem; color:#64748b;">종목 데이터가 깨끗하게 비워진 상태입니다.</span>
+        </div>
+        """, unsafe_allow_html=True)
 
-        # 3. ⚙️ [수량 & 평단가 편집] 접이식 메뉴 딱 하나로 깔끔하게 정리!
-        st.markdown("---")
-        with st.expander("⚙️ 보유 수량 및 평단가 간편 편집", expanded=False):
+    # 3. ⚙️ [수량 & 평단가 편집 / 종목 추가]
+    st.markdown("---")
+    with st.expander("⚙️ 보유 종목 편집 및 새 종목 추가", expanded=(not bool(portfolio_items))):
+        if st.session_state.my_portfolio:
             st.caption("수정할 종목의 수량이나 평단가를 고친 뒤 아래 [저장하기]를 누르세요.")
-            
             updated_p = {}
             for s_sym, s_inf in st.session_state.my_portfolio.items():
                 c_l, c_s, c_p = st.columns([1.5, 2, 2])
@@ -603,43 +607,42 @@ with tab_portfolio:
                     st.session_state.my_portfolio = {}
                     save_portfolio({})
                     st.rerun()
+        else:
+            if st.button("🔄 토스 계좌 원본 불러오기 (20주/15주)", type="primary", use_container_width=True, key="restore_toss_btn"):
+                default_data = {
+                    "SOXL": {"shares": 20, "avg_price": 66.10},
+                    "TQQQ": {"shares": 15, "avg_price": 60.03},
+                    "TSLA": {"shares": 1, "avg_price": 393.02},
+                    "NVDA": {"shares": 2, "avg_price": 174.93}
+                }
+                st.session_state.my_portfolio = default_data
+                save_portfolio(default_data)
+                st.rerun()
 
-            st.markdown("---")
-            st.markdown("##### ➕ 새 종목 추가")
-            q_c = st.columns(6)
-            for idx, pt in enumerate(["SOXL", "TQQQ", "TSLA", "NVDA", "NVDL", "CONL"]):
-                with q_c[idx]:
-                    if st.button(pt, key=f"add_p_{pt}", use_container_width=True):
-                        st.session_state["add_p_sym"] = pt
-            
-            init_new = st.session_state.get("add_p_sym", "")
-            c_n1, c_n2, c_n3, c_n4 = st.columns([1.5, 1.5, 1.5, 1.5])
-            with c_n1:
-                add_sym = st.text_input("티커", value=init_new, key="add_p_input").strip().upper()
-            with c_n2:
-                add_sh = st.number_input("수량", min_value=1, value=1, step=1)
-            with c_n3:
-                add_pr = st.number_input("평단가($)", min_value=0.01, value=50.0, step=0.1, format="%.2f")
-            with c_n4:
-                st.write("")
-                st.write("")
-                if st.button("추가", use_container_width=True):
-                    if add_sym:
-                        st.session_state.my_portfolio[add_sym] = {"shares": int(add_sh), "avg_price": round(float(add_pr), 2)}
-                        save_portfolio(st.session_state.my_portfolio)
-                        st.rerun()
-    else:
-        st.write("아직 등록된 보유 종목이 없습니다.")
-        if st.button("🔄 토스 계좌 원본 불러오기 (20주/15주)"):
-            default_data = {
-                "SOXL": {"shares": 20, "avg_price": 66.10},
-                "TQQQ": {"shares": 15, "avg_price": 60.03},
-                "TSLA": {"shares": 1, "avg_price": 393.02},
-                "NVDA": {"shares": 2, "avg_price": 174.93}
-            }
-            st.session_state.my_portfolio = default_data
-            save_portfolio(default_data)
-            st.rerun()
+        st.markdown("---")
+        st.markdown("##### ➕ 새 종목 추가")
+        q_c = st.columns(6)
+        for idx, pt in enumerate(["SOXL", "TQQQ", "TSLA", "NVDA", "NVDL", "CONL"]):
+            with q_c[idx]:
+                if st.button(pt, key=f"add_p_{pt}", use_container_width=True):
+                    st.session_state["add_p_sym"] = pt
+        
+        init_new = st.session_state.get("add_p_sym", "")
+        c_n1, c_n2, c_n3, c_n4 = st.columns([1.5, 1.5, 1.5, 1.5])
+        with c_n1:
+            add_sym = st.text_input("티커", value=init_new, key="add_p_input").strip().upper()
+        with c_n2:
+            add_sh = st.number_input("수량", min_value=1, value=1, step=1)
+        with c_n3:
+            add_pr = st.number_input("평단가($)", min_value=0.01, value=50.0, step=0.1, format="%.2f")
+        with c_n4:
+            st.write("")
+            st.write("")
+            if st.button("추가", use_container_width=True):
+                if add_sym:
+                    st.session_state.my_portfolio[add_sym] = {"shares": int(add_sh), "avg_price": round(float(add_pr), 2)}
+                    save_portfolio(st.session_state.my_portfolio)
+                    st.rerun()
 
     # --------------------------------------------------------------------------
     # 하단: 시드 퀘스트 & 장부 (접어두기)
